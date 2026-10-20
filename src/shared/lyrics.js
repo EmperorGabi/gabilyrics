@@ -77,5 +77,38 @@
     return out;
   }
 
-  return { parse, serialize, fromPlain, pages };
+  /**
+   * Split slides into "cards" — exactly what one screen will show.
+   * n = lines per screen (0 = whole slide). orphan = 'own' | 'merge' (fold a lone last line into the card before).
+   * Every card knows its slide and its line range, both within the slide and across the whole song (g).
+   */
+  function cards(slides, n, orphan) {
+    const out = [];
+    let g = 0;
+    (slides || []).forEach((sl, si) => {
+      const lines = String(sl.text || '').split('\n');
+      const chunks = [];
+      if (!n || n <= 0 || lines.length <= n) chunks.push([0, lines.length]);
+      else {
+        for (let i = 0; i < lines.length; i += n) chunks.push([i, Math.min(lines.length, i + n)]);
+        const last = chunks[chunks.length - 1];
+        if (orphan === 'merge' && n > 1 && chunks.length > 1 && last[1] - last[0] === 1) { chunks.pop(); chunks[chunks.length - 1][1] = last[1]; }
+      }
+      chunks.forEach(([a, b], ci) => {
+        out.push({ slide: si, label: sl.label, start: a, end: b, g: g + a, gEnd: g + b, part: ci + 1, parts: chunks.length, lines: lines.slice(a, b), text: lines.slice(a, b).join('\n') });
+      });
+      g += lines.length;
+    });
+    return out;
+  }
+
+  /** Where each slide starts in song-wide line numbers. */
+  function slideStarts(slides) {
+    const out = []; let g = 0;
+    (slides || []).forEach((sl) => { out.push(g); g += String(sl.text || '').split('\n').length; });
+    out.push(g);
+    return out;
+  }
+
+  return { parse, serialize, fromPlain, pages, cards, slideStarts };
 });

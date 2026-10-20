@@ -23,8 +23,9 @@
     online: { state: 'idle', query: '', results: [], ms: 0, error: null }, forceOnline: false,
     temp: {},              // online songs being previewed (not saved yet)
     selectedId: null, tab: 'plan',
-    live: { songId: null, slide: 0, page: 0 }, mode: 'lower', blank: true,
-    kb: -1,                // keyboard-highlighted search result
+    live: { songId: null, line: 0 }, mode: 'lower', blank: true,
+    kb: -1,
+    groupVerses: (() => { try { return localStorage.getItem('gl-group') === '1'; } catch (e) { return false; } })(),                // keyboard-highlighted search result
   };
 
   const getSong = (id) => S.songs.find((s) => s.id === id) || S.temp[id] || null;
@@ -58,71 +59,91 @@
     $('#setFull').src = base + '/output?style=full&target=monitor&sample=1';
   }
 
-  // ---------------- live / paging ----------------
-  function pagesOf(slide, mode) {
-    const n = mode === 'lower' ? Number(S.settings.lower.linesPerPage) : 0;
-    return Lyrics.pages(slide.text, n);
-  }
+  // ---------------- live / screens ----------------
+  // A "card" is exactly one screen of the current output style (e.g. 2 lines for a lower third).
+  // The live position is a song-wide line number, so switching style — or outputs that use
+  // different styles at the same time — never loses your place.
+  function linesPer(mode) { return mode === 'lower' ? (Number(S.settings.lower.linesPerPage) || 0) : 0; }
+  function cardsOf(song, mode) { return song ? Lyrics.cards(song.slides, linesPer(mode || S.mode), S.settings.lower.orphan || 'own') : []; }
+  function cardAt(cards, g) { return cards.find((c) => g >= c.g && g < c.gEnd) || null; }
+  function allLines(song) { return song.slides.reduce((a, sl) => a.concat(String(sl.text || '').split('\n')), []); }
 
-  function nextPos(pos) {
-    const song = getSong(pos.songId); if (!song) return null;
-    const sl = song.slides[pos.slide]; if (!sl) return null;
-    const pages = pagesOf(sl, S.mode);
-    if (pos.page < pages.length - 1) return { songId: pos.songId, slide: pos.slide, page: pos.page + 1 };
-    if (pos.slide < song.slides.length - 1) return { songId: pos.songId, slide: pos.slide + 1, page: 0 };
-    return null;
+  // What one output style shows at line g: a whole card, or (after Shift+click) a window starting mid-card.
+  function screenAt(song, g, mode) {
+    mode = mode || S.mode;
+    const cards = cardsOf(song, mode);
+    const card = cardAt(cards, g) || cards[0];
+    if (!card) return null;
+    if (mode !== 'lower' || g <= card.g) return { card, cards, g: card.g, gEnd: card.gEnd, custom: false };
+    const n = linesPer('lower') || (card.gEnd - card.g);
+    const slideEnd = Lyrics.slideStarts(song.slides)[card.slide + 1];
+    return { card, cards, g, gEnd: Math.min(g + n, slideEnd), custom: true };
   }
-  function prevPos(pos) {
-    const song = getSong(pos.songId); if (!song) return null;
-    if (pos.page > 0) return { songId: pos.songId, slide: pos.slide, page: pos.page - 1 };
-    if (pos.slide > 0) { const p = pagesOf(song.slides[pos.slide - 1], S.mode); return { songId: pos.songId, slide: pos.slide - 1, page: p.length - 1 }; }
-    return null;
+  function screenText(song, sc) { return allLines(song).slice(sc.g, sc.gEnd).join('\n'); }
+  function cardLabel(c) { return c.label + (c.parts > 1 ? ' · ' + c.part + '/' + c.parts : ''); }
+
+  function nextG(song, g) {
+    const sc = screenAt(song, g); if (!sc) return null;
+    const c = cardAt(sc.cards, sc.gEnd);   // after a mid-card start this snaps back onto the grid
+    return c ? c.g : null;
+  }
+  function prevG(song, g) {
+    const sc = screenAt(song, g); if (!sc) return null;
+    if (sc.custom) return sc.card.g;
+    const i = sc.cards.indexOf(sc.card);
+    return i > 0 ? sc.cards[i - 1].g : null;
   }
 
   function pushLive() {
-    const pos = S.live;
-    const song = getSong(pos.songId);
-    const payload = { mode: S.mode, blank: S.blank, song: null, label: '', text: '', page: '', first: false, next: null };
-    if (song && song.slides[pos.slide]) {
-      const sl = song.slides[pos.slide];
-      const pages = pagesOf(sl, S.mode);
-      pos.page = Math.min(pos.page, pages.length - 1);
+    const song = getSong(S.live.songId);
+    const payload = { mode: S.mode, blank: S.blank, song: null, label: '', text: '', page: '', lower: '', first: false, next: null };
+    const sc = song && song.slides.length ? screenAt(song, S.live.line) : null;
+    if (sc) {
+      const lowSc = screenAt(song, S.live.line, 'lower');
       Object.assign(payload, {
         song: { id: song.id, title: song.title, author: song.author || '', copyright: song.copyright || '' },
-        label: sl.label, text: sl.text, page: pages[pos.page], first: pos.slide === 0 && pos.page === 0,
+        label: cardLabel(sc.card), text: song.slides[sc.card.slide].text,
+        page: screenText(song, sc), lower: screenText(song, lowSc), first: sc.g === 0, line: S.live.line,
       });
-      const np = nextPos(pos);
-      if (np) { const ns = song.slides[np.slide]; payload.next = { label: ns.label, text: ns.text, page: pagesOf(ns, S.mode)[np.page], first: false }; }
+      const ng = nextG(song, S.live.line);
+      if (ng != null) {
+        const nc = cardAt(sc.cards, ng);
+        payload.next = { label: cardLabel(nc), text: song.slides[nc.slide].text, page: nc.text, lower: screenText(song, screenAt(song, ng, 'lower')), first: false };
+      }
     } else {
-      // nothing live yet: preview shows the selected song's first slide
+      // nothing live yet: preview shows the selected song's first screen
       const sel = getSong(S.selectedId);
-      if (sel && sel.slides[0]) payload.next = { label: sel.slides[0].label, text: sel.slides[0].text, page: pagesOf(sel.slides[0], S.mode)[0], first: true };
+      const c = cardsOf(sel)[0];
+      if (c) payload.next = { label: cardLabel(c), text: sel.slides[c.slide].text, page: c.text, lower: cardsOf(sel, 'lower')[0].text, first: true };
     }
     vc.live.set(payload);
-    renderLiveBits(payload);
+    renderLiveBits(payload, sc);
   }
 
-  async function goLive(songId, slide, page) {
+  async function goLive(songId, line) {
     let song = getSong(songId);
     if (!song) return;
     if (song.source === 'online-temp' && S.settings.search.cacheOnline) song = await saveOnline(song, true);
-    S.live = { songId: song.id, slide, page: page || 0 };
+    S.live = { songId: song.id, line: line || 0 };
     S.blank = false;
     pushLive(); renderSlides(); renderList();
   }
 
   function step(dir) {
-    if (!S.live.songId) { const sel = getSong(S.selectedId); if (sel && sel.slides.length) goLive(sel.id, 0, 0); return; }
-    const p = dir > 0 ? nextPos(S.live) : prevPos(S.live);
-    if (!p) { toast(dir > 0 ? 'End of song' : 'Start of song'); return; }
-    S.live = p; S.blank = false; pushLive(); renderSlides();
+    if (!S.live.songId) { const sel = getSong(S.selectedId); if (sel && sel.slides.length) goLive(sel.id, 0); return; }
+    const song = getSong(S.live.songId);
+    const g = song ? (dir > 0 ? nextG(song, S.live.line) : prevG(song, S.live.line)) : null;
+    if (g == null) { toast(dir > 0 ? 'End of song' : 'Start of song'); return; }
+    S.live.line = g; S.blank = false; pushLive(); renderSlides();
   }
 
   function setMode(m) {
     if (S.mode === m) return;
-    S.mode = m; S.live.page = 0;
+    S.mode = m;   // live line is kept: lower → full shows the verse containing it, full → lower its 2-line screen
     $('#modeLower').setAttribute('aria-pressed', m === 'lower');
     $('#modeFull').setAttribute('aria-pressed', m === 'full');
+    $('#railLower').setAttribute('aria-pressed', m === 'lower');
+    $('#railFull').setAttribute('aria-pressed', m === 'full');
     pushLive(); renderSlides();
   }
 
@@ -293,7 +314,7 @@
   $('#tabLib').onclick = () => { S.tab = 'library'; renderList(); };
   $('#planName').addEventListener('change', (e) => { S.plan.name = e.target.value; vc.plan.set(S.plan); });
 
-  // ---------------- slides ----------------
+  // ---------------- slides (cards = screens) ----------------
   function renderSlides() {
     const song = getSong(S.selectedId);
     const grid = $('#slides');
@@ -303,32 +324,70 @@
     if (!song) { $('#selTitle').textContent = 'No song selected'; $('#selMeta').textContent = 'Search or pick a song from the plan'; grid.innerHTML = ''; return; }
     $('#selTitle').textContent = song.title;
     const src = song.source === 'online-temp' ? 'Online — preview, not saved yet' : song.source === 'online' ? 'Saved from online' : 'Local';
-    $('#selMeta').textContent = [song.author, song.slides.length + ' slides', src].filter(Boolean).join(' · ');
+    const cards = cardsOf(song);
+    const split = cards.length !== song.slides.length;
+    $('#selMeta').textContent = [song.author, song.slides.length + ' slides' + (split ? ' → ' + cards.length + ' screens of ' + linesPer('lower') + ' lines' : ''), src].filter(Boolean).join(' · ');
     if (!song.slides.length) { grid.innerHTML = '<div class="empty">This song has no lyrics yet. Press “Edit lyrics”.</div>'; return; }
     const isLiveSong = song.id === S.live.songId;
-    const np = isLiveSong ? nextPos(S.live) : null;
-    grid.innerHTML = song.slides.map((sl, i) => {
-      const live = isLiveSong && i === S.live.slide;
-      const next = np && np.slide === i && !live;
-      const pages = pagesOf(sl, S.mode).length;
-      return '<button type="button" class="slide' + (live ? ' live' : '') + (next ? ' next' : '') + '" data-slide="' + i + '">'
-        + '<span class="h"><span class="lab">' + (i + 1) + ' · ' + esc(sl.label) + '</span>'
-        + (live ? '<span class="livetag">LIVE</span>' : next ? '<span class="nexttag">NEXT</span>' : '') + '</span>'
-        + '<span class="tx">' + esc(sl.text) + '</span>'
-        + (pages > 1 ? '<span class="pg">' + (live ? 'Page ' + (S.live.page + 1) + ' of ' + pages : pages + ' lower-third pages') + '</span>' : '')
-        + '</button>';
-    }).join('');
+    const sc = isLiveSong ? screenAt(song, S.live.line) : null;
+    const ng = isLiveSong ? nextG(song, S.live.line) : null;
+    const lowerMode = S.mode === 'lower' && linesPer('lower') > 0;
+    const grouped = lowerMode && S.groupVerses;
+    $('#groupBtn').hidden = !lowerMode;
+    $('#groupBtn').setAttribute('aria-pressed', grouped);
+    const cardHtml = (c, i) => {
+      const live = !!sc && sc.card.g === c.g;
+      const next = !live && ng != null && c.g === ng;
+      const body = c.lines.map((ln, k) => {
+        const g = c.g + k;
+        const on = !!sc && sc.custom && g >= sc.g && g < sc.gEnd;
+        return '<span class="ln' + (on ? ' on' : '') + '" data-g="' + g + '">' + (esc(ln) || '&nbsp;') + '</span>';
+      }).join('');
+      return '<button type="button" class="slide' + (lowerMode ? ' mini' : '') + (lowerMode && c.part === 1 && !grouped ? ' vstart' : '') + (live ? ' live' : '') + (next ? ' next' : '') + '" data-card="' + i + '" data-g="' + c.g + '">'
+        + '<span class="h"><span class="lab">' + (i + 1) + ' · ' + esc(cardLabel(c)) + '</span>'
+        + (live ? '<span class="livetag">' + (sc.custom ? 'LIVE · FROM LINE ' + (sc.g - c.g + 1) : 'LIVE') + '</span>' : next ? '<span class="nexttag">NEXT</span>' : '') + '</span>'
+        + '<span class="tx">' + body + '</span></button>';
+    };
+    let h = '';
+    if (grouped) {
+      let open = false;
+      cards.forEach((c, i) => {
+        if (c.part === 1) {
+          if (open) h += '</div>';
+          h += '<div class="sect"><span>' + esc(c.label) + '</span><span class="muted">' + (c.parts > 1 ? c.parts + ' screens' : '1 screen') + '</span></div><div class="sgrid">';
+          open = true;
+        }
+        h += cardHtml(c, i);
+      });
+      if (open) h += '</div>';
+    } else {
+      // one continuous grid: screens flow across the full width, verse starts are marked on the card
+      h = '<div class="sgrid flow">' + cards.map(cardHtml).join('') + '</div>';
+    }
+    grid.innerHTML = h;
   }
-  $('#slides').addEventListener('click', (e) => { const b = e.target.closest('[data-slide]'); if (b) goLive(S.selectedId, Number(b.dataset.slide), 0); });
+  $('#groupBtn').onclick = () => {
+    S.groupVerses = !S.groupVerses;
+    try { localStorage.setItem('gl-group', S.groupVerses ? '1' : '0'); } catch (e) { /* ignore */ }
+    renderSlides();
+  };
+  $('#slides').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-card]'); if (!b) return;
+    const ln = e.target.closest('.ln');
+    // Shift+click a line: start the screen at exactly that line (for a singer who restarts mid-pair)
+    const g = e.shiftKey && ln && S.mode === 'lower' ? Number(ln.dataset.g) : Number(b.dataset.g);
+    goLive(S.selectedId, g);
+  });
 
-  function renderLiveBits(p) {
+  function renderLiveBits(p, sc) {
     $('#liveCaption').textContent = p.song ? (p.blank ? 'Cleared · ' : '') + p.song.title + ' · ' + p.label : 'Nothing live';
     $('#nextCaption').textContent = p.next ? p.next.label : (p.song ? 'End of song' : '—');
     $('#blankBtn').setAttribute('aria-pressed', S.blank && !!p.song);
-    const song = getSong(S.live.songId);
-    if (song && song.slides[S.live.slide]) {
-      const pages = pagesOf(song.slides[S.live.slide], S.mode).length;
-      $('#livePos').textContent = 'Slide ' + (S.live.slide + 1) + ' of ' + song.slides.length + (pages > 1 ? ' · page ' + (S.live.page + 1) + '/' + pages : '');
+    const rl = $('#railLive'); const onAir = !!p.song && !p.blank;
+    rl.classList.toggle('on', onAir); rl.title = onAir ? 'Live: ' + p.song.title + ' · ' + p.label : 'Nothing live';
+    if (sc) {
+      const i = sc.cards.indexOf(sc.card);
+      $('#livePos').textContent = 'Screen ' + (i + 1) + ' of ' + sc.cards.length + (sc.custom ? ' · from line ' + (sc.g - sc.card.g + 1) : '');
     } else $('#livePos').textContent = '';
   }
 
@@ -404,7 +463,7 @@
     await vc.library.remove(editingId);
     S.songs = S.songs.filter((x) => x.id !== editingId);
     S.plan.items = S.plan.items.filter((x) => x !== editingId);
-    if (S.live.songId === editingId) { S.live = { songId: null, slide: 0, page: 0 }; S.blank = true; }
+    if (S.live.songId === editingId) { S.live = { songId: null, line: 0 }; S.blank = true; }
     reindex(); S.selectedId = S.plan.items[0] || (S.songs[0] && S.songs[0].id) || null;
     $('#editor').close(); pushLive(); renderAll();
   };
@@ -451,7 +510,7 @@
       setPath(partial, k, v);
     }
     S.settings = await vc.settings.set(partial);
-    if (/^lower\.linesPerPage/.test(k)) { pushLive(); renderSlides(); }
+    if (/^lower\.(linesPerPage|orphan)/.test(k)) { pushLive(); renderSlides(); }
     renderStatus();
   }
   $('#settingsView').addEventListener('change', (e) => { if (e.target.dataset && e.target.dataset.k) applySetting(e.target); });
@@ -467,11 +526,29 @@
     if (inSettings) { fillSettings(); renderStatus(); }
   };
 
+  // ---------------- collapsible panels ----------------
+  const panels = (() => { try { return JSON.parse(localStorage.getItem('gl-panels')) || {}; } catch (e) { return {}; } })();
+  function setPanel(side, collapsed) {
+    panels[side] = collapsed;
+    $(side === 'left' ? '#leftCol' : '#rightCol').classList.toggle('collapsed', collapsed);
+    try { localStorage.setItem('gl-panels', JSON.stringify(panels)); } catch (e) { /* ignore */ }
+  }
+  ['left', 'right'].forEach((side) => setPanel(side, !!panels[side]));
+  document.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-collapse]'); if (c) { setPanel(c.dataset.collapse, true); return; }
+    const x = e.target.closest('[data-expand]'); if (x) setPanel(x.dataset.expand, false);
+  });
+  function focusSearch() { if (panels.left) setPanel('left', false); $('#q').focus(); $('#q').select(); }
+  $('#railSearch').onclick = focusSearch;
+  $('#railPlan').onclick = () => { setPanel('left', false); S.tab = 'plan'; renderList(); };
+  $('#railLower').onclick = () => setMode('lower');
+  $('#railFull').onclick = () => setMode('full');
+
   // ---------------- keyboard ----------------
   document.addEventListener('keydown', (e) => {
     if ($('#editor').open) return;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-    if ((e.key === '/' && !typing) || ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'k'))) { e.preventDefault(); $('#q').focus(); $('#q').select(); return; }
+    if ((e.key === '/' && !typing) || ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'k'))) { e.preventDefault(); focusSearch(); return; }
     if (typing || inSettings || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); step(1); }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
@@ -480,7 +557,9 @@
     else if (e.key === 'l' || e.key === 'L') setMode('lower');
     else if (e.key === 'f' || e.key === 'F') setMode('full');
     else if (e.key === 't' || e.key === 'T') toggleTheme();
-    else if (/^[1-9]$/.test(e.key)) { const s = getSong(S.selectedId); const i = Number(e.key) - 1; if (s && s.slides[i]) goLive(s.id, i, 0); }
+    else if (e.key === '[') setPanel('left', !panels.left);
+    else if (e.key === ']') setPanel('right', !panels.right);
+    else if (/^[1-9]$/.test(e.key)) { const s = getSong(S.selectedId); const c = cardsOf(s)[Number(e.key) - 1]; if (c) goLive(s.id, c.g); }
   });
 
   function renderAll() { renderResults(); renderList(); renderSlides(); renderStatus(); }

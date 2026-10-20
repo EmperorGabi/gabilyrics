@@ -28,9 +28,16 @@
 
 <!-- ================= CONSOLE ================= -->
 <div id="consoleView" class="cols">
-  <aside class="col left">
+  <aside class="col left" id="leftCol">
+    <div class="rail" aria-label="Song panel (collapsed)">
+      <button type="button" class="btn icon-sm" data-expand="left" aria-label="Expand song panel ([)" title="Expand song panel ([)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m13 10 2 2-2 2"/></svg></button>
+      <button type="button" class="btn icon-sm ghost" id="railSearch" aria-label="Search songs (/)" title="Search songs (/)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+      <button type="button" class="btn icon-sm ghost" id="railPlan" aria-label="Service plan" title="Service plan"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
+    </div>
+    <div class="pane">
     <div class="field">
-      <label for="q" class="eyebrow">Search songs <kbd>/</kbd></label>
+      <div class="row between"><label for="q" class="eyebrow">Search songs <kbd>/</kbd></label>
+        <button type="button" class="btn icon-sm ghost" data-collapse="left" aria-label="Collapse song panel ([)" title="Collapse song panel ([)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m15 10-2 2 2 2"/></svg></button></div>
       <div class="searchbox">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A93A2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="q" type="search" placeholder="Title or any line of lyrics…" autocomplete="off" spellcheck="false">
@@ -48,6 +55,7 @@
       <button class="btn" id="newSong" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New song</button>
       <button class="btn" id="importBtn" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></svg>Import</button>
     </div>
+    </div>
   </aside>
 
   <main class="col center">
@@ -58,6 +66,7 @@
       </div>
       <div class="row gap8 wrap">
         <button class="btn ghost" id="saveOnline" type="button" hidden>Save to library</button>
+        <button class="btn ghost" id="groupBtn" type="button" aria-pressed="false" title="Start each verse on a new row">Group by verse</button>
         <button class="btn ghost" id="editSong" type="button">Edit lyrics</button>
         <button class="btn ghost" id="addToPlan" type="button">Add to plan</button>
       </div>
@@ -76,9 +85,17 @@
     </div>
   </main>
 
-  <aside class="col right">
+  <aside class="col right" id="rightCol">
+    <div class="rail" aria-label="Output panel (collapsed)">
+      <button type="button" class="btn icon-sm" data-expand="right" aria-label="Expand output panel (])" title="Expand output panel (])"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><path d="m11 10-2 2 2 2"/></svg></button>
+      <span class="rail-live" id="railLive" title="Nothing live"><i class="dot off"></i></span>
+      <button type="button" class="btn icon-sm ghost" id="railLower" aria-pressed="true" aria-label="Lower third (L)" title="Lower third (L)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15h18"/></svg></button>
+      <button type="button" class="btn icon-sm ghost" id="railFull" aria-pressed="false" aria-label="Full screen (F)" title="Full screen (F)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M7 14h10"/></svg></button>
+    </div>
+    <div class="pane">
     <div class="field">
-      <span class="eyebrow">Output style</span>
+      <div class="row between"><span class="eyebrow">Output style</span>
+        <button type="button" class="btn icon-sm ghost" data-collapse="right" aria-label="Collapse output panel (])" title="Collapse output panel (])"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><path d="m9 10 2 2-2 2"/></svg></button></div>
       <div class="seg" role="group" aria-label="Output style">
         <button type="button" id="modeLower" aria-pressed="true" title="Lower third (L)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15h18"/></svg>Lower third</button>
         <button type="button" id="modeFull" aria-pressed="false" title="Full screen (F)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M7 14h10"/></svg>Full screen</button>
@@ -95,6 +112,7 @@
     <div class="field">
       <span class="eyebrow">Sending to</span>
       <div class="outlist" id="outList"></div>
+    </div>
     </div>
   </aside>
 </div>
@@ -152,6 +170,7 @@
           <label>Size (px at 1080p)<input type="number" min="16" max="120" data-k="lower.size" data-num></label>
           <label>Weight<select data-k="lower.weight" data-num><option>400</option><option>500</option><option>600</option><option>700</option><option>800</option></select></label>
           <label>Lines per page<select data-k="lower.linesPerPage" data-num><option value="2">2 lines</option><option value="1">1 line</option><option value="3">3 lines</option><option value="0">Whole slide</option></select></label>
+          <label>Leftover single line<select data-k="lower.orphan"><option value="own">Its own screen</option><option value="merge">Join the screen before</option></select></label>
           <label>Text color<input type="color" data-k="lower.color"></label>
           <label>Box color<input type="color" data-k="lower.boxColor"></label>
           <label>Box opacity (%)<input type="range" min="0" max="100" data-k="lower.boxOpacity" data-num></label>
@@ -204,7 +223,7 @@
   </div>
 </div>
 
-<footer class="footer"><span id="footLeft"></span><span>Click a slide to send it live · <kbd>→</kbd>/<kbd>Space</kbd> next · <kbd>←</kbd> back · <kbd>C</kbd> clear · <kbd>L</kbd>/<kbd>F</kbd> style · <kbd>T</kbd> theme · <kbd>1-9</kbd> jump</span></footer>
+<footer class="footer"><span id="footLeft"></span><span>Click a screen to send it live · <kbd>Shift</kbd>+click a line to start there · <kbd>→</kbd>/<kbd>Space</kbd> next · <kbd>←</kbd> back · <kbd>C</kbd> clear · <kbd>L</kbd>/<kbd>F</kbd> style · <kbd>T</kbd> theme · <kbd>[</kbd>/<kbd>]</kbd> panels · <kbd>1-9</kbd> jump</span></footer>
 
 <!-- ================= SONG EDITOR ================= -->
 <dialog id="editor" aria-labelledby="edTitleH">

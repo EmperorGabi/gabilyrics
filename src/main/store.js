@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
   },
   lower: {
     font: 'Segoe UI, Helvetica Neue, Arial, sans-serif', size: 44, weight: 600, color: '#FFFFFF',
-    boxColor: '#080A0E', boxOpacity: 82, bottom: 64, side: 120, linesPerPage: 2,
+    boxColor: '#080A0E', boxOpacity: 82, bottom: 64, side: 120, linesPerPage: 2, orphan: 'own',
     showTitle: 'first', accent: '#F5A524', uppercase: false,
   },
   full: {

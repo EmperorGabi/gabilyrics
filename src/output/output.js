@@ -85,7 +85,7 @@
     lowerTxt.style.textTransform = L.uppercase ? 'uppercase' : 'none';
     tag.style.background = L.accent || '#F5A524';
 
-    const text = isLower ? (src.page || src.text || '') : (src.text || '');
+    const text = isLower ? (src.lower || src.page || src.text || '') : (src.text || '');
     const song = SAMPLE ? { title: 'Amazing Grace', author: 'John Newton', copyright: 'Public domain' } : (st.song || {});
     const showTag = isLower && !blank && song.title && (L.showTitle === 'always' || (L.showTitle === 'first' && src.first));
     let creditText = '';

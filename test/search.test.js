@@ -45,6 +45,22 @@ t('pages', () => {
   assert.deepStrictEqual(Lyrics.pages('1\n2\n3\n4\n5', 2), ['1\n2', '3\n4', '5']);
   assert.deepStrictEqual(Lyrics.pages('1\n2', 0), ['1\n2']);
 });
+t('cards: 10 + 8 lines at 2 per screen = 9 cards', () => {
+  const ten = Array.from({ length: 10 }, (_, i) => 'a' + i).join('\n');
+  const eight = Array.from({ length: 8 }, (_, i) => 'b' + i).join('\n');
+  const c = Lyrics.cards([{ label: 'Verse 1', text: ten }, { label: 'Verse 2', text: eight }], 2);
+  assert.strictEqual(c.length, 9);
+  assert.deepStrictEqual([c[4].g, c[4].gEnd, c[4].part, c[4].parts], [8, 10, 5, 5]);
+  assert.deepStrictEqual([c[5].slide, c[5].g, c[5].start], [1, 10, 0]);
+  assert.strictEqual(Lyrics.cards([{ label: 'V', text: ten }], 0).length, 1);
+});
+t('cards: orphan line own vs merge', () => {
+  const nine = Array.from({ length: 9 }, (_, i) => 'x' + i).join('\n');
+  assert.strictEqual(Lyrics.cards([{ label: 'V', text: nine }], 2, 'own').length, 5);
+  const m = Lyrics.cards([{ label: 'V', text: nine }], 2, 'merge');
+  assert.strictEqual(m.length, 4); assert.strictEqual(m[3].lines.length, 3);
+  assert.deepStrictEqual(Lyrics.slideStarts([{ text: 'a\nb' }, { text: 'c' }]), [0, 2, 3]);
+});
 t('speed: 10k songs under 50ms', () => {
   const many = [];
   const base = seed();

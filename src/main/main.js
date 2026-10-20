@@ -193,7 +193,7 @@ async function selfTest(dir) {
     await wait(2500);
     await js(`document.querySelector('#q').value='grace';document.querySelector('#q').dispatchEvent(new Event('input'));`);
     await wait(400);
-    await js(`document.querySelector('[data-slide="1"]').click()`);
+    await js(`document.querySelector('[data-card="1"]').click()`);
     await wait(900);
     await shot('1-console-lower');
     await js(`document.querySelector('#modeFull').click()`);
