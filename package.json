@@ -1,45 +1,49 @@
 {
   "name": "gabilyrics",
   "version": "1.0.0",
-  "description": "Lyrics presenter for live events, church services and livestreams — lower thirds, full screen, NDI and browser-source output.",
+  "description": "Gabilyrics",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/search.test.js",
-    "ndi:install": "npm install @stagetimerio/grandiose --no-save && npx --yes @electron/rebuild -f -w @stagetimerio/grandiose",
+    "test": "node test/search.test.js && node test/online.test.js",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac"
   },
-  "author": "633Innovations",
+  "author": "Gabriel Ochai",
   "license": "UNLICENSED",
   "devDependencies": {
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8"
   },
   "productName": "Gabilyrics",
-  "optionalDependencies": {
-    "@stagetimerio/grandiose": "0.2.1"
-  },
   "build": {
-    "appId": "org.ignition633.gabilyrics",
+    "appId": "com.gabrielochai.gabilyrics",
     "productName": "Gabilyrics",
     "files": [
       "src/**/*",
       "package.json"
     ],
     "asarUnpack": [
-      "**/@stagetimerio/grandiose/dist/**"
+      "**/node_modules/grandi/**",
+      "**/node_modules/@grandi/**"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "src/assets/icon.ico"
     },
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.video"
+      "category": "public.app-category.video",
+      "icon": "src/assets/icon.png"
     },
     "linux": {
-      "target": "AppImage"
-    }
+      "target": "AppImage",
+      "icon": "src/assets/icon.png"
+    },
+    "copyright": "Copyright © 2026 Gabriel Ochai"
+  },
+  "dependencies": {
+    "grandi": "2.0.2"
   }
 }

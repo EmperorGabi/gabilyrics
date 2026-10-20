@@ -170,17 +170,23 @@
     renderResults();
   }
 
+  const notSaved = (rows) => { const saved = new Set(S.songs.map((s) => s.remoteId).filter(Boolean)); return (rows || []).filter((x) => !saved.has(x.remoteId)); };
+  // results stream in as each lyrics site answers
+  vc.online.onProgress((p) => {
+    if (p.query !== S.query.trim() || S.online.query !== p.query || S.online.state !== 'loading') return;
+    S.online.results = notSaved(p.results); S.online.ms = p.ms; S.online.pending = p.pending; S.online.done = p.done;
+    renderResults();
+  });
   async function fetchOnline(q) {
     const r = await vc.online.search(q);
     if (r.aborted || q !== S.query.trim()) return;
-    const saved = new Set(S.songs.map((s) => s.remoteId).filter(Boolean));
-    S.online = { state: r.error ? 'error' : 'done', query: q, results: (r.results || []).filter((x) => !saved.has(x.remoteId)), ms: r.ms || 0, error: r.error || null, source: r.source };
+    S.online = { state: r.error ? 'error' : 'done', query: q, results: notSaved(r.results), ms: r.ms || 0, error: r.error || null, done: r.sources || [], errors: r.errors || [], cached: !!r.cached };
     renderResults();
   }
 
   function onlineToTemp(r) {
     const id = 'tmp:' + r.remoteId;
-    S.temp[id] = { id, title: r.title, author: r.author, copyright: '', source: 'online-temp', remoteId: r.remoteId, slides: r.slides };
+    S.temp[id] = { id, title: r.title, author: r.author, copyright: r.copyright || '', source: 'online-temp', remoteId: r.remoteId, slides: r.slides };
     return S.temp[id];
   }
 
@@ -231,16 +237,16 @@
     if (showOnline) {
       const o = S.online;
       h += '<div class="res-head"><span class="eyebrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg>Online</span><span class="ms">'
-        + (o.state === 'loading' ? '<span class="spinner"></span>' : o.state === 'error' ? 'offline' : o.results.length + ' results' + (o.ms ? ' · ' + o.ms + ' ms' : ' · cached')) + '</span></div>';
-      if (o.state === 'error') h += '<div class="note">Couldn’t reach the online source (' + esc(o.error) + '). Check your internet connection.</div>';
-      else if (o.state === 'done' && !o.results.length) h += '<div class="note">Nothing found online either. Try the song title or artist.</div>';
+        + (o.state === 'loading' ? (o.results.length ? o.results.length + ' so far · ' : '') + '<span class="spinner"></span>' : o.state === 'error' ? 'offline' : o.results.length + ' results' + (o.cached ? ' · cached' : o.ms ? ' · ' + o.ms + ' ms' : '')) + '</span></div>';
+      if (o.state === 'error') h += '<div class="note">Couldn’t get lyrics online — ' + esc(o.error) + '. <button type="button" class="btn small" id="retryOnline">Try again</button></div>';
+      else if (o.state === 'done' && !o.results.length) h += '<div class="note">Nothing found online either. ' + (S.settings.search.geniusToken ? 'Try the song title or artist.' : 'Try the song title — or add a free Genius token in Settings to find songs from any line of the lyrics.') + '</div>';
       o.results.forEach((r) => {
         const first = r.slides[0] ? r.slides[0].text.split('\n')[0] : '';
         const lines = r.slides.map((x) => x.text).join('\n').split('\n');
         const words = SongSearch.norm(q).split(' ')[0];
         const hit = lines.find((l) => SongSearch.norm(l).includes(SongSearch.norm(q))) || lines.find((l) => SongSearch.norm(l).includes(words)) || first;
         h += '<div class="res" data-online="' + esc(r.remoteId) + '" data-n="' + n + '" role="button" tabindex="0"><span class="body"><span class="t">' + hl(r.title, q) + '</span>'
-          + '<span class="l">“' + hl(hit, q) + '”</span><span class="m"><span>' + esc(r.author) + '</span><span>' + r.slides.length + ' slides</span></span></span>'
+          + '<span class="l">“' + hl(hit, q) + '”</span><span class="m"><span>' + esc(r.author) + '</span><span>' + r.slides.length + ' slides</span><span class="k">' + esc(r.source || '') + '</span></span></span>'
           + '<button type="button" class="btn primary small" data-save="' + esc(r.remoteId) + '" aria-label="Save to library">+ Save</button></div>';
         n++;
       });
@@ -252,6 +258,7 @@
     const save = e.target.closest('[data-save]');
     if (save) { e.stopPropagation(); const r = S.online.results.find((x) => x.remoteId === save.dataset.save); if (r) saveOnline(onlineToTemp(r)); return; }
     if (e.target.closest('#alsoOnline')) { S.forceOnline = true; runSearch(S.query); return; }
+    if (e.target.closest('#retryOnline')) { S.online = { state: 'idle', query: '', results: [], ms: 0, error: null }; S.forceOnline = true; runSearch(S.query); return; }
     const pick = e.target.closest('[data-pick]');
     if (pick) { select(pick.dataset.pick); return; }
     const on = e.target.closest('[data-online]');
@@ -435,7 +442,7 @@
     const o = S.settings.outputs;
     const ndiOut = (k) => (i.ndi.outputs || []).find((x) => x.key === k);
     const ndiDot = (k) => { if (!o[k].enabled) return 'off'; if (!i.ndi.available) return 'warn'; const x = ndiOut(k); return x && x.running ? 'ok' : 'warn'; };
-    const ndiText = (k) => { if (!o[k].enabled) return 'Off'; if (!i.ndi.available) return 'NDI runtime not installed'; const x = ndiOut(k); if (!x) return 'Starting…'; if (x.error) return x.error; return x.connections + ' receiver' + (x.connections === 1 ? '' : 's') + ' · ' + o[k].width + '×' + o[k].height + ' ' + o[k].fps + 'fps'; };
+    const ndiText = (k) => { if (!o[k].enabled) return 'Off'; if (!i.ndi.available) return i.ndi.error ? 'NDI unavailable' : 'Starting…'; const x = ndiOut(k); if (!x) return 'Starting…'; if (x.error) return x.error; return x.connections + ' receiver' + (x.connections === 1 ? '' : 's') + ' · ' + o[k].width + '×' + o[k].height + ' ' + o[k].fps + 'fps'; };
     const styleName = { follow: 'follows style', lower: 'lower third', full: 'full screen' };
     $('#statusPills').innerHTML =
       '<span class="pill"><i class="dot ' + ndiDot('ndiProgram') + '"></i>NDI · Program</span>'
@@ -452,7 +459,7 @@
     $$('[data-ndi]').forEach((el) => { const k = el.dataset.ndi; el.innerHTML = '<i class="dot ' + ndiDot(k) + '"></i>' + esc(ndiText(k)); });
     const help = $('#ndiHelp');
     help.hidden = i.ndi.available;
-    if (!i.ndi.available) help.innerHTML = '<b>NDI is not active.</b> Install the free NDI Tools / Runtime from ndi.video, then reinstall this app’s NDI module (see README → “Enable NDI”). Everything else, including the browser source for OBS/vMix, works without it.';
+    if (!i.ndi.available) help.innerHTML = '<b>NDI could not start.</b> ' + esc(i.ndi.error || 'The NDI module is missing.') + ' — run <code>npm install</code> in the project folder and restart the app. The browser source for OBS/vMix works without NDI.';
     $('#browserUrls').innerHTML = ['lower', 'full', 'follow'].map((st) => {
       const u = i.serverUrl + '/output?style=' + st;
       return '<div class="url"><code>' + esc(u) + '</code><button type="button" class="btn small" data-copy="' + esc(u) + '">Copy</button></div>';
@@ -518,6 +525,7 @@
   $('#importBtn2').onclick = doImport;
   $('#exportBtn').onclick = async () => { const p = await vc.library.exportAll(); if (p) toast('Exported to ' + p); };
   $('#openData').onclick = () => vc.openData();
+  $('#geniusLink').onclick = (e) => { e.preventDefault(); vc.openUrl('https://genius.com/api-clients'); };
 
   // ---------------- transport buttons ----------------
   $('#nextBtn').onclick = () => step(1);

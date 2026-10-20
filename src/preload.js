@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('vc', {
   plans: { get: call('plans:get'), set: call('plans:set') },
   settings: { get: call('settings:get'), set: call('settings:set') },
   live: { set: call('live:set') },
-  online: { search: call('online:search') },
+  online: { search: call('online:search'), onProgress: (cb) => ipcRenderer.on('online:progress', (_e, p) => cb(p)) },
   pickImage: call('dialog:image'),
   openData: call('open:data'),
   openUrl: call('open:url'),

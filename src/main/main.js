@@ -8,6 +8,10 @@ const { NdiManager } = require('./ndi');
 const online = require('./online');
 const Lyrics = require('../shared/lyrics');
 
+// Same icon everywhere: taskbar / dock, window, installer and the console's top bar.
+const APP_ICON = path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+if (process.platform === 'win32') app.setAppUserModelId('com.gabrielochai.gabilyrics');
+
 let store, server, ndi;
 let consoleWin = null;
 let projectorWin = null;
@@ -52,6 +56,7 @@ function applyProjector() {
     return;
   }
   projectorWin = new BrowserWindow({
+    icon: APP_ICON,
     x: target.bounds.x, y: target.bounds.y, width: target.bounds.width, height: target.bounds.height,
     frame: false, backgroundColor: '#000000', show: false, skipTaskbar: true, title: 'Gabilyrics — Projector',
     fullscreen: target.id !== primary.id, webPreferences: { backgroundThrottling: false },
@@ -77,6 +82,7 @@ function titleBarOverlay(theme) {
 }
 function createConsole() {
   consoleWin = new BrowserWindow({
+    icon: APP_ICON,
     width: 1440, height: 900, minWidth: 980, minHeight: 640, backgroundColor: store.settings.theme === 'light' ? '#F3F4F6' : '#0E1014', title: 'Gabilyrics',
     show: false,
     // No separate title bar: the app's own top bar is the drag area, with the system window buttons drawn on top of it.
@@ -148,6 +154,7 @@ function registerIpc() {
   ipcMain.handle('settings:set', async (_e, partial) => {
     const prevServer = JSON.stringify(store.settings.server);
     const s = store.setSettings(partial);
+    if (partial && partial.search) online.clearCache();
     nativeTheme.themeSource = s.theme === 'light' ? 'light' : 'dark';
     if (consoleWin) consoleWin.setBackgroundColor(s.theme === 'light' ? '#F3F4F6' : '#0E1014');
     if (consoleWin && process.platform !== 'darwin' && consoleWin.setTitleBarOverlay) { try { consoleWin.setTitleBarOverlay(titleBarOverlay(s.theme)); } catch (e) { /* older Electron */ } }
@@ -167,7 +174,9 @@ function registerIpc() {
     return live.seq;
   });
 
-  ipcMain.handle('online:search', (_e, q) => online.search(q, store.settings.search.provider));
+  ipcMain.handle('online:search', (e, q) => online.search(q, store.settings.search, (partial) => {
+    if (!e.sender.isDestroyed()) e.sender.send('online:progress', partial);
+  }));
 
   ipcMain.handle('dialog:image', async () => {
     const r = await dialog.showOpenDialog(consoleWin, { title: 'Background image', properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }] });
@@ -179,6 +188,7 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin' && app.dock) { try { app.dock.setIcon(path.join(__dirname, '..', 'assets', 'icon.png')); } catch (e) { /* ignore */ } }
   store = new Store(path.join(app.getPath('userData'), 'data'));
   nativeTheme.themeSource = store.settings.theme === 'light' ? 'light' : 'dark';
   server = new OutputServer(() => live, () => store.settings);

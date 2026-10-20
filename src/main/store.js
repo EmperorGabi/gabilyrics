@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS = {
     font: 'Segoe UI, Helvetica Neue, Arial, sans-serif', size: 72, weight: 700, color: '#FFFFFF',
     bg: '#000000', bgImage: '', bgDim: 40, credit: 'full', licence: '', shadow: true,
   },
-  search: { autoOnline: true, cacheOnline: true, provider: 'lrclib' },
+  search: { autoOnline: true, cacheOnline: true, sources: { genius: true, lrclib: true, hymnary: true, lyricsovh: true }, geniusToken: '' },
   server: { port: 7380, lan: false },
   transition: 200,
   theme: 'dark',

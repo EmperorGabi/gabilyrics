@@ -31,17 +31,13 @@ npm run dist:mac   # macOS .dmg               (run on a Mac)
 
 The installer is written to `dist/`.
 
-## Enable NDI
+## NDI
 
-NDI uses the native module `@stagetimerio/grandiose`, which downloads the NDI SDK and compiles when you install. It's listed as optional, so if it can't build, the rest of the app still installs and works.
+NDI works out of the box: `npm install` downloads the `grandi` package, which includes prebuilt NDI binaries for Windows, macOS and Linux. Nothing needs to be compiled, and you don't need to install the NDI SDK.
 
-1. Install the free **NDI Tools** (which includes the runtime) from https://ndi.video.
-2. Install a C++ build toolchain:
-   - **Windows:** "Visual Studio Build Tools" with the *Desktop development with C++* workload, plus Python 3.
-   - **macOS:** run `xcode-select --install`.
-3. In the project folder, run `npm run ndi:install`, then `npm start`.
-
-The status pills at the top of the console turn green when the senders are running. The output list shows how many receivers are connected. In OBS, add an **NDI Source** (with the DistroAV plugin) and pick `GABILYRICS (Lower third)`.
+- The status pills at the top turn green when the senders are running. The output list shows how many receivers are connected.
+- In OBS, install the DistroAV plugin, add an **NDI Source** and pick `GABILYRICS (Lower third)`. vMix, Wirecast, TriCaster and NDI Studio Monitor see it directly.
+- If the pills stay orange, Settings shows the exact error. Windows Firewall may ask to allow Gabilyrics on first launch: allow it on private networks, or other computers won't see the NDI sources.
 
 ## Keyboard
 

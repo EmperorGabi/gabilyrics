@@ -1,11 +1,25 @@
 // NDI senders. Each output renders the output page in an off-screen (transparent) window
-// and pushes its BGRA frames to the network with the NDI SDK (via @stagetimerio/grandiose).
-// NDI is optional: if the native module is not installed the rest of the app works normally.
+// and pushes its BGRA frames to the network with the NDI SDK, via the `grandi` package.
+// grandi ships prebuilt binaries with the NDI library included for Windows, macOS and Linux,
+// so nothing has to be compiled or installed separately. If it can't load, the rest of the app still works.
 const { BrowserWindow } = require('electron');
 
 let ndi = null;
 let loadError = null;
-try { ndi = require('@stagetimerio/grandiose'); } catch (e) { loadError = e.message; }
+let loading = null;
+function loadNdi() {
+  if (!loading) {
+    loading = import('grandi')
+      .then((m) => {
+        const g = m.default || m;
+        if (g.isSupportedCPU && !g.isSupportedCPU()) throw new Error('This CPU is not supported by NDI');
+        if (g.initialize && !g.initialize()) throw new Error('The NDI library failed to start');
+        ndi = g;
+      })
+      .catch((e) => { loadError = (e && e.message) || String(e); console.error('[ndi]', loadError); });
+  }
+  return loading;
+}
 
 const FOURCC_BGRA = 1095911234; // 'BGRA'
 
@@ -89,6 +103,7 @@ class NdiManager {
   loadError() { return loadError; }
 
   async apply(outputsCfg) {
+    await loadNdi();
     for (const key of ['ndiProgram', 'ndiKey']) {
       const cfg = outputsCfg[key];
       const cur = this.outputs[key];

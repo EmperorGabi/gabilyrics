@@ -176,7 +176,7 @@ mark { background: var(--hit-bg); color: var(--hit); border-radius: 2px; padding
 .badge { padding: 2px 6px; border-radius: 4px; background: var(--line); font-size: 10px; font-weight: 700; letter-spacing: .6px; margin-right: 6px; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--label); }
 label.check { flex-direction: row; font-size: 14px; color: var(--text); gap: 12px; }
-input[type=text], input[type=number], input[type=search]:not(#q), select, textarea { min-height: 38px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font-size: 13px; }
+input[type=text], input[type=password], input[type=number], input[type=search]:not(#q), select, textarea { min-height: 38px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font-size: 13px; }
 textarea { padding: 10px; font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
 input[type=color] { height: 38px; width: 100%; padding: 2px; border-radius: 6px; border: 1px solid var(--line2); background: var(--bg); }
 input[type=range] { accent-color: var(--accent); min-height: 38px; }
@@ -278,3 +278,10 @@ label.eyebrow { flex-direction: row; }
 .menu-action.danger, .menu-action.danger svg { color: var(--danger); }
 dialog.small-dialog { width: min(420px, 92vw); }
 .tabs button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px; }
+
+/* online sources list in settings */
+.sources { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
+.sources label.check { font-size: 13px; }
+.sources .token { padding-left: 0; gap: 6px; }
+.sources .token input { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.brand .app-icon { display: block; flex: none; border-radius: 6px; }
