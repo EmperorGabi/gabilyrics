@@ -1,0 +1,45 @@
+{
+  "name": "gabilyrics",
+  "version": "1.0.0",
+  "description": "Lyrics presenter for live events, church services and livestreams — lower thirds, full screen, NDI and browser-source output.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/search.test.js",
+    "ndi:install": "npm install @stagetimerio/grandiose --no-save && npx --yes @electron/rebuild -f -w @stagetimerio/grandiose",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "author": "633Innovations",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "productName": "Gabilyrics",
+  "optionalDependencies": {
+    "@stagetimerio/grandiose": "0.2.1"
+  },
+  "build": {
+    "appId": "org.ignition633.gabilyrics",
+    "productName": "Gabilyrics",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/@stagetimerio/grandiose/dist/**"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.video"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
