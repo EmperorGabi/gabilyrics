@@ -69,10 +69,19 @@ async function applyOutputs() {
 }
 
 // ---------- console window ----------
+const TOPBAR_HEIGHT = 52;
+function titleBarOverlay(theme) {
+  return theme === 'light'
+    ? { color: '#FFFFFF', symbolColor: '#14171C', height: TOPBAR_HEIGHT }
+    : { color: '#12151B', symbolColor: '#E8EAED', height: TOPBAR_HEIGHT };
+}
 function createConsole() {
   consoleWin = new BrowserWindow({
     width: 1440, height: 900, minWidth: 980, minHeight: 640, backgroundColor: store.settings.theme === 'light' ? '#F3F4F6' : '#0E1014', title: 'Gabilyrics',
     show: false,
+    // No separate title bar: the app's own top bar is the drag area, with the system window buttons drawn on top of it.
+    titleBarStyle: 'hidden',
+    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 16, y: 18 } } : { titleBarOverlay: titleBarOverlay(store.settings.theme) }),
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   consoleWin.setMenuBarVisibility(false);
@@ -141,6 +150,7 @@ function registerIpc() {
     const s = store.setSettings(partial);
     nativeTheme.themeSource = s.theme === 'light' ? 'light' : 'dark';
     if (consoleWin) consoleWin.setBackgroundColor(s.theme === 'light' ? '#F3F4F6' : '#0E1014');
+    if (consoleWin && process.platform !== 'darwin' && consoleWin.setTitleBarOverlay) { try { consoleWin.setTitleBarOverlay(titleBarOverlay(s.theme)); } catch (e) { /* older Electron */ } }
     if (JSON.stringify(s.server) !== prevServer) {
       await ndi.stopAll();
       await server.stop();
