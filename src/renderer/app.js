@@ -25,6 +25,7 @@
     selectedId: null, tab: 'plan',
     live: { songId: null, line: 0 }, mode: 'lower', blank: true,
     kb: -1,
+    colsChoice: (() => { try { return Number(localStorage.getItem('gl-cols')) || 0; } catch (e) { return 0; } })(),   // 0 = auto
     groupVerses: (() => { try { return localStorage.getItem('gl-group') === '1'; } catch (e) { return false; } })(),                // keyboard-highlighted search result
   };
 
@@ -350,22 +351,60 @@
     };
     let h = '';
     if (grouped) {
-      let open = false;
-      cards.forEach((c, i) => {
-        if (c.part === 1) {
-          if (open) h += '</div>';
-          h += '<div class="sect"><span>' + esc(c.label) + '</span><span class="muted">' + (c.parts > 1 ? c.parts + ' screens' : '1 screen') + '</span></div><div class="sgrid">';
-          open = true;
-        }
-        h += cardHtml(c, i);
-      });
-      if (open) h += '</div>';
+      // Verse groups pack side by side on one shared column grid (CSS subgrid), so every card keeps
+      // the same width and short verses sit next to each other instead of stretching.
+      const groups = [];
+      cards.forEach((c, i) => { if (c.part === 1) groups.push([]); groups[groups.length - 1].push([c, i]); });
+      const cols = S.colsChoice || bestCols(groups.map((g) => g.length), S.cols);
+      h = '<div class="sgrid packed" style="grid-template-columns: repeat(' + cols + ', minmax(0, 1fr))">' + groups.map((g) => {
+        const c0 = g[0][0];
+        return '<div class="vgroup" style="grid-column: span ' + Math.min(g.length, cols) + '">'
+          + '<div class="sect"><span>' + esc(c0.label) + '</span><span class="muted">' + (c0.parts > 1 ? c0.parts + ' screens' : '1 screen') + '</span></div>'
+          + g.map(([c, i]) => cardHtml(c, i)).join('') + '</div>';
+      }).join('') + '</div>';
     } else {
       // one continuous grid: screens flow across the full width, verse starts are marked on the card
-      h = '<div class="sgrid flow">' + cards.map(cardHtml).join('') + '</div>';
+      const fixed = S.colsChoice ? ' style="grid-template-columns: repeat(' + S.colsChoice + ', minmax(0, 1fr))"' : '';
+      h = '<div class="sgrid flow"' + fixed + '>' + cards.map(cardHtml).join('') + '</div>';
     }
     grid.innerHTML = h;
   }
+  // Pick the column count for grouped verses: as many as fit, but fewer (wider cards) when that
+  // packs the verses with fewer rows or fewer empty cells — e.g. 2-screen verses in 3 columns
+  // would leave a hole in every row, so use 2 wider columns instead.
+  function bestCols(sizes, maxCols) {
+    const minCols = Math.max(1, Math.ceil(maxCols / 2));
+    let best = null;
+    for (let c = maxCols; c >= minCols; c--) {
+      let rows = 0, rowH = 0, used = 0;
+      sizes.forEach((n) => {
+        const span = Math.min(n, c), h = Math.ceil(n / c);
+        if (used + span > c) { rows += rowH; used = 0; rowH = 0; }
+        used += span; rowH = Math.max(rowH, h);
+      });
+      rows += rowH;
+      const total = sizes.reduce((a, b) => a + b, 0);
+      const waste = rows * c - total;
+      if (!best || rows < best.rows || (rows === best.rows && waste < best.waste)) best = { c, rows, waste };
+    }
+    return best ? best.c : maxCols;
+  }
+
+  // how many card columns fit — grouped verses must never span more than this
+  S.cols = 1;
+  const CARD_MIN = 240, GAP = 12;
+  new ResizeObserver(() => {
+    const w = $('#slides').clientWidth;
+    const cols = Math.max(1, Math.floor((w + GAP) / (CARD_MIN + GAP)));
+    if (cols !== S.cols) { S.cols = cols; if (S.groupVerses) renderSlides(); }
+  }).observe($('#slides'));
+  $('#colsSelect').value = String(S.colsChoice);
+  UISelect.enhance(document);
+  $('#colsSelect').addEventListener('change', (e) => {
+    S.colsChoice = Number(e.target.value) || 0; e.target.blur();
+    try { localStorage.setItem('gl-cols', String(S.colsChoice)); } catch (err) { /* ignore */ }
+    renderSlides();
+  });
   $('#groupBtn').onclick = () => {
     S.groupVerses = !S.groupVerses;
     try { localStorage.setItem('gl-group', S.groupVerses ? '1' : '0'); } catch (e) { /* ignore */ }
@@ -497,6 +536,7 @@
       const v = getK(S.settings, k);
       if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : String(v);
     });
+    UISelect.refresh();
     $('#bgName').textContent = S.settings.full.bgImage ? S.settings.full.bgImage.split(/[\\/]/).pop() : 'None';
   }
   function setPath(obj, k, v) { const ps = k.split('.'); let o = obj; ps.slice(0, -1).forEach((p) => { o[p] = o[p] || {}; o = o[p]; }); o[ps[ps.length - 1]] = v; }

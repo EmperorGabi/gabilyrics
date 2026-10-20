@@ -6,6 +6,7 @@
   --off: #4A515C; --accent-hi: #FFB840; --danger: #FDA29B; --danger-line: #7A271A; --pressed-bg: #3A2A0B; --pressed-text: #FFD27A;
   --label: #9AA3AF; --notice-bg: #1F1808; --notice-line: #5A4210; --backdrop: rgba(0,0,0,.6); --toast: #262C36;
   --scroll: #333B47; --scroll-hi: #4A5463; --kind: #F5A524;
+  --ring: #6B7584; --ring-soft: rgba(138,147,162,.28); --pop-shadow: 0 12px 32px -8px rgba(0,0,0,.6), 0 4px 12px -4px rgba(0,0,0,.4);
   color-scheme: dark;
 }
 :root[data-theme="light"] {
@@ -16,6 +17,7 @@
   --off: #B4BBC6; --accent-hi: #FFB840; --danger: #B42318; --danger-line: #F3B5AE; --pressed-bg: #FEF0C7; --pressed-text: #7A4B00;
   --label: #5C6573; --notice-bg: #FFF8E6; --notice-line: #F5D48A; --backdrop: rgba(20,23,28,.35); --toast: #FFFFFF;
   --scroll: #C6CCD5; --scroll-hi: #A3ACB9; --kind: #B54708;
+  --ring: #8A93A2; --ring-soft: rgba(92,101,115,.18); --pop-shadow: 0 12px 28px -8px rgba(20,23,28,.18), 0 4px 10px -4px rgba(20,23,28,.10);
   color-scheme: light;
 }
 
@@ -124,7 +126,9 @@ mark { background: var(--hit-bg); color: var(--hit); border-radius: 2px; padding
 .songhead h1 { margin: 0 0 4px; font-size: 22px; }
 .slides { display: flex; flex-direction: column; gap: 10px; }
 .sgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; align-content: start; }
-.sgrid:not(.flow) { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.sgrid.packed { row-gap: 18px; }
+.vgroup { display: grid; grid-template-columns: subgrid; row-gap: 10px; align-content: start; }
+.vgroup > .sect { grid-column: 1 / -1; margin-top: 0; }
 .slide.vstart .lab { color: var(--kind); }
 .slide { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-height: 140px; padding: 12px 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); cursor: pointer; text-align: left; }
 .slide:hover { border-color: var(--line2); background: var(--card-hi); }
@@ -229,3 +233,25 @@ label.eyebrow { flex-direction: row; }
 .rail .btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
 .rail-live { display: flex; align-items: center; justify-content: center; width: 36px; height: 24px; }
 .rail-live.on .dot { background: #F04438; box-shadow: 0 0 0 4px var(--live-soft); }
+
+/* columns picker in the song header */
+.colsel { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); }
+.colsel select { min-height: 36px; padding: 0 8px; }
+
+/* ---------- styled select (shadcn-like) ---------- */
+.ui-native { display: none !important; }
+.ui-select-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 38px; padding: 0 10px 0 12px; border-radius: 6px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font-size: 13px; text-align: left; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.06); transition: border-color .12s, box-shadow .12s; }
+.ui-select-trigger:hover { border-color: var(--ring); }
+.ui-select-trigger:focus-visible, .ui-select-trigger[aria-expanded="true"] { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px var(--ring-soft); }
+.ui-select-trigger:disabled { opacity: .5; cursor: not-allowed; }
+.ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-select-trigger .ui-chev { flex: none; opacity: .55; transition: transform .15s ease; }
+.ui-select-trigger[aria-expanded="true"] .ui-chev { transform: rotate(180deg); }
+.ui-select-content { position: fixed; z-index: 100; box-sizing: border-box; padding: 4px; border-radius: 8px; border: 1px solid var(--line2); background: var(--panel); color: var(--text); box-shadow: var(--pop-shadow); overflow-y: auto; opacity: 0; transform: translateY(-4px) scale(.98); transform-origin: top center; transition: opacity .12s ease, transform .12s ease; }
+.ui-select-content[data-side="top"] { transform: translateY(4px) scale(.98); transform-origin: bottom center; }
+.ui-select-content.open { opacity: 1; transform: none; }
+.ui-select-item { position: relative; display: flex; align-items: center; min-height: 32px; padding: 6px 32px 6px 8px; border-radius: 4px; font-size: 13px; cursor: pointer; user-select: none; white-space: nowrap; }
+.ui-select-item.active { background: var(--card-hi); }
+.ui-select-item[aria-selected="true"] { font-weight: 500; }
+.ui-check { position: absolute; right: 8px; display: flex; color: var(--text); }
+.colsel .ui-select-trigger { width: 88px; height: 36px; }

@@ -66,6 +66,9 @@
       </div>
       <div class="row gap8 wrap">
         <button class="btn ghost" id="saveOnline" type="button" hidden>Save to library</button>
+        <label class="colsel" title="Cards per row">Columns
+          <select id="colsSelect"><option value="0">Auto</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
+        </label>
         <button class="btn ghost" id="groupBtn" type="button" aria-pressed="false" title="Start each verse on a new row">Group by verse</button>
         <button class="btn ghost" id="editSong" type="button">Edit lyrics</button>
         <button class="btn ghost" id="addToPlan" type="button">Add to plan</button>
@@ -259,6 +262,7 @@
 
 <script src="../shared/lyrics.js"></script>
 <script src="../shared/search.js"></script>
+<script src="ui-select.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
