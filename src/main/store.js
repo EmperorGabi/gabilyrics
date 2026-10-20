@@ -40,16 +40,21 @@ class Store {
     this.files = {
       library: path.join(dir, 'library.json'),
       settings: path.join(dir, 'settings.json'),
-      plan: path.join(dir, 'plan.json'),
+      plans: path.join(dir, 'plans.json'),
     };
     this.library = this._read(this.files.library, null);
     if (!Array.isArray(this.library)) { this.library = seed(); this._write('library'); }
     this.settings = deepMerge(DEFAULT_SETTINGS, this._read(this.files.settings, {}));
-    this.plan = this._read(this.files.plan, null);
-    if (!this.plan || !Array.isArray(this.plan.items)) {
-      this.plan = { name: 'Service plan', items: ['amazing-grace', 'holy-holy-holy', 'it-is-well', 'blessed-assurance'] };
-      this._write('plan');
+    // Several saved service plans; one is current. Migrates the single plan.json from earlier versions.
+    this.plans = this._read(this.files.plans, null);
+    if (!this.plans || !Array.isArray(this.plans.plans) || !this.plans.plans.length) {
+      const old = this._read(path.join(dir, 'plan.json'), null);
+      const items = old && Array.isArray(old.items) ? old.items : ['amazing-grace', 'holy-holy-holy', 'it-is-well', 'blessed-assurance'];
+      const name = old && old.name ? old.name : 'Sunday Service';
+      this.plans = { current: 'plan-1', plans: [{ id: 'plan-1', name, items, updatedAt: Date.now() }] };
+      this._write('plans');
     }
+    if (!this.plans.plans.some((p) => p.id === this.plans.current)) this.plans.current = this.plans.plans[0].id;
     this._timers = {};
   }
 
@@ -84,11 +89,14 @@ class Store {
 
   deleteSong(id) {
     this.library = this.library.filter((s) => s.id !== id);
-    this.plan.items = this.plan.items.filter((x) => x !== id);
-    this.save('library'); this.save('plan');
+    this.plans.plans.forEach((p) => { p.items = p.items.filter((x) => x !== id); });
+    this.save('library'); this.save('plans');
   }
 
-  setPlan(plan) { this.plan = plan; this.save('plan'); }
+  setPlans(plans) {
+    if (!plans || !Array.isArray(plans.plans) || !plans.plans.length) return false;
+    this.plans = plans; this.save('plans'); return true;
+  }
 
   setSettings(partial) { this.settings = deepMerge(this.settings, partial); this.save('settings'); return this.settings; }
 }

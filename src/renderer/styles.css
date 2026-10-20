@@ -255,3 +255,20 @@ label.eyebrow { flex-direction: row; }
 .ui-select-item[aria-selected="true"] { font-weight: 500; }
 .ui-check { position: absolute; right: 8px; display: flex; color: var(--text); }
 .colsel .ui-select-trigger { width: 88px; height: 36px; }
+
+/* service plan switcher */
+.plan-btn { display: inline-flex; align-items: center; gap: 8px; height: 32px; max-width: 280px; padding: 0 8px 0 10px; border-radius: 6px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font-size: 13px; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.plan-btn:hover { border-color: var(--ring); }
+.plan-btn:focus-visible, .plan-btn[aria-expanded="true"] { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px var(--ring-soft); }
+.plan-btn > svg { flex: none; color: var(--muted); }
+.plan-btn-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.plan-menu { max-width: 360px; }
+.menu-label { padding: 6px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+.menu-sep { height: 1px; margin: 4px -4px; background: var(--line); }
+.plan-menu .plan-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.menu-meta { margin-left: 12px; font-size: 11px; color: var(--muted); flex: none; }
+.menu-action { gap: 8px; padding-right: 8px; color: var(--text2); }
+.menu-action svg { flex: none; color: var(--muted); }
+.menu-action.danger, .menu-action.danger svg { color: var(--danger); }
+dialog.small-dialog { width: min(420px, 92vw); }
+.tabs button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px; }

@@ -132,8 +132,8 @@ function registerIpc() {
     return r.filePath;
   });
 
-  ipcMain.handle('plan:get', () => store.plan);
-  ipcMain.handle('plan:set', (_e, plan) => { store.setPlan(plan); return true; });
+  ipcMain.handle('plans:get', () => store.plans);
+  ipcMain.handle('plans:set', (_e, plans) => store.setPlans(plans));
 
   ipcMain.handle('settings:get', () => store.settings);
   ipcMain.handle('settings:set', async (_e, partial) => {

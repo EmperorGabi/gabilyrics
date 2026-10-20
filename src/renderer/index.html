@@ -11,7 +11,11 @@
   <div class="brand">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5A524" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 14h10"/><path d="M9 10h6"/><path d="M8 21h8"/></svg>
     <span class="name">Gabilyrics</span>
-    <input id="planName" class="chip-input" aria-label="Service name" value="Service plan">
+    <button type="button" id="planBtn" class="plan-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="planMenu" title="Switch service plan">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg>
+      <span class="plan-btn-name" id="planBtnName">Service plan</span>
+      <svg class="ui-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+    </button>
   </div>
   <div class="status" id="statusPills"></div>
   <div class="top-actions">
@@ -19,9 +23,10 @@
       <svg class="moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       <svg class="sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
     </button>
-    <button class="btn ghost" id="toggleView" type="button">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
-      <span>Outputs &amp; settings</span>
+    <button class="btn ghost" id="toggleView" type="button" title="Settings">
+      <svg class="ic-settings" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      <svg class="ic-back" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+      <span>Settings</span>
     </button>
   </div>
 </header>
@@ -243,6 +248,14 @@
       <button class="btn danger" type="button" id="edDelete">Delete song</button>
       <span class="row gap8"><button class="btn ghost" type="button" id="edCancel">Cancel</button><button class="btn primary" type="submit" id="edSave">Save</button></span>
     </div>
+  </form>
+</dialog>
+
+<dialog id="nameDialog" class="small-dialog" aria-labelledby="nameTitle">
+  <form method="dialog" id="nameForm">
+    <h2 id="nameTitle">Name</h2>
+    <label>Name<input type="text" id="nameInput" maxlength="80" required></label>
+    <div class="row gap8" style="justify-content:flex-end"><button class="btn ghost" type="button" id="nameCancel">Cancel</button><button class="btn primary" type="submit" id="nameOk">Save</button></div>
   </form>
 </dialog>
 

@@ -17,7 +17,7 @@
 
   // ---------------- state ----------------
   const S = {
-    songs: [], plan: { name: 'Service plan', items: [] }, settings: null, info: null,
+    songs: [], plans: null, plan: null, settings: null, info: null,
     index: new SongSearch.Index(),
     query: '', local: [], localMs: 0,
     online: { state: 'idle', query: '', results: [], ms: 0, error: null }, forceOnline: false,
@@ -38,10 +38,10 @@
   }
 
   // ---------------- boot ----------------
-  [S.songs, S.plan, S.settings, S.info] = await Promise.all([vc.library.all(), vc.plan.get(), vc.settings.get(), vc.info()]);
+  [S.songs, S.plans, S.settings, S.info] = await Promise.all([vc.library.all(), vc.plans.get(), vc.settings.get(), vc.info()]);
+  S.plan = S.plans.plans.find((p) => p.id === S.plans.current) || S.plans.plans[0];
   reindex();
   S.selectedId = S.plan.items.find((id) => getSong(id)) || (S.songs[0] && S.songs[0].id) || null;
-  $('#planName').value = S.plan.name || 'Service plan';
   applyTheme(S.settings.theme || 'dark');
   async function toggleTheme() {
     const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
@@ -191,7 +191,7 @@
     delete S.temp[song.id];
     if (S.selectedId === song.id) S.selectedId = saved.id;
     if (S.live.songId === song.id) S.live.songId = saved.id;
-    if (!S.plan.items.includes(saved.id)) { S.plan.items.push(saved.id); vc.plan.set(S.plan); }
+    if (!S.plan.items.includes(saved.id)) { S.plan.items.push(saved.id); savePlans(); }
     S.online.results = S.online.results.filter((x) => x.remoteId !== song.remoteId);
     if (!quiet) toast('Saved “' + saved.title + '” to your library');
     renderAll();
@@ -297,7 +297,7 @@
   }
   $('#list').addEventListener('click', (e) => {
     const rm = e.target.closest('[data-remove]');
-    if (rm) { e.stopPropagation(); S.plan.items.splice(Number(rm.dataset.remove), 1); vc.plan.set(S.plan); renderList(); return; }
+    if (rm) { e.stopPropagation(); S.plan.items.splice(Number(rm.dataset.remove), 1); savePlans(); renderList(); return; }
     const p = e.target.closest('[data-pick]'); if (p) select(p.dataset.pick);
   });
   $('#list').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const p = e.target.closest('[data-pick]'); if (p) select(p.dataset.pick); } });
@@ -308,12 +308,11 @@
     const it = e.target.closest('[data-i]'); if (!it || dragFrom === null) return;
     e.preventDefault();
     const to = Number(it.dataset.i); const [m] = S.plan.items.splice(dragFrom, 1); S.plan.items.splice(to, 0, m);
-    dragFrom = null; vc.plan.set(S.plan); renderList();
+    dragFrom = null; savePlans(); renderList();
   });
   $('#list').addEventListener('dragend', () => { dragFrom = null; $$('.item.drag-over').forEach((x) => x.classList.remove('drag-over')); });
   $('#tabPlan').onclick = () => { S.tab = 'plan'; renderList(); };
   $('#tabLib').onclick = () => { S.tab = 'library'; renderList(); };
-  $('#planName').addEventListener('change', (e) => { S.plan.name = e.target.value; vc.plan.set(S.plan); });
 
   // ---------------- slides (cards = screens) ----------------
   function renderSlides() {
@@ -488,7 +487,7 @@
     if (i >= 0) S.songs[i] = saved; else S.songs.push(saved);
     reindex();
     S.selectedId = saved.id;
-    if (!editingId && !S.plan.items.includes(saved.id)) { S.plan.items.push(saved.id); vc.plan.set(S.plan); }
+    if (!editingId && !S.plan.items.includes(saved.id)) { S.plan.items.push(saved.id); savePlans(); }
     $('#editor').close();
     toast('Saved “' + saved.title + '”');
     if (S.live.songId === saved.id) pushLive();
@@ -509,7 +508,7 @@
 
   $('#newSong').onclick = () => openEditor(null);
   $('#editSong').onclick = () => { const s = getSong(S.selectedId); if (s) openEditor(s); };
-  $('#addToPlan').onclick = () => { if (S.selectedId && !S.plan.items.includes(S.selectedId)) { S.plan.items.push(S.selectedId); vc.plan.set(S.plan); toast('Added to plan'); renderList(); renderSlides(); } };
+  $('#addToPlan').onclick = () => { if (S.selectedId && !S.plan.items.includes(S.selectedId)) { S.plan.items.push(S.selectedId); savePlans(); toast('Added to plan'); renderList(); renderSlides(); } };
   $('#saveOnline').onclick = () => { const s = getSong(S.selectedId); if (s && s.source === 'online-temp') saveOnline(s); };
   async function doImport() {
     const r = await vc.library.importFiles();
@@ -562,9 +561,124 @@
   $('#toggleView').onclick = () => {
     inSettings = !inSettings;
     $('#consoleView').hidden = inSettings; $('#settingsView').hidden = !inSettings;
-    $('#toggleView span').textContent = inSettings ? 'Back to console' : 'Outputs & settings';
+    $('#toggleView span').textContent = inSettings ? 'Back to console' : 'Settings';
+    $('#toggleView').title = inSettings ? 'Back to console' : 'Settings';
+    $('#toggleView .ic-settings').style.display = inSettings ? 'none' : '';
+    $('#toggleView .ic-back').style.display = inSettings ? '' : 'none';
     if (inSettings) { fillSettings(); renderStatus(); }
   };
+
+  // ---------------- service plans (switcher) ----------------
+  function savePlans() { S.plan.updatedAt = Date.now(); S.plans.current = S.plan.id; vc.plans.set(S.plans); }
+  function renderPlanBtn() {
+    $('#planBtnName').textContent = S.plan.name;
+    $('#tabPlan').textContent = S.plan.name;
+    $('#tabPlan').title = 'Songs in “' + S.plan.name + '”';
+  }
+  function switchPlan(id) {
+    const p = S.plans.plans.find((x) => x.id === id); if (!p) return;
+    S.plan = p; S.plans.current = id; vc.plans.set(S.plans);
+    S.tab = 'plan';
+    if (!S.live.songId) S.selectedId = p.items.find((x) => getSong(x)) || S.selectedId;
+    renderPlanBtn(); renderList(); renderSlides(); if (!S.live.songId) pushLive();
+    toast('Switched to “' + p.name + '”');
+  }
+  function uniqueName(base) {
+    const names = new Set(S.plans.plans.map((p) => p.name.toLowerCase()));
+    if (!names.has(base.toLowerCase())) return base;
+    for (let i = 2; ; i++) { const n = base + ' ' + i; if (!names.has(n.toLowerCase())) return n; }
+  }
+  function newPlanId() { return 'plan-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  // small name dialog (Electron has no window.prompt)
+  function askName(title, value, okText) {
+    return new Promise((resolve) => {
+      const d = $('#nameDialog');
+      $('#nameTitle').textContent = title;
+      $('#nameOk').textContent = okText || 'Save';
+      $('#nameInput').value = value || '';
+      const done = (v) => { d.close(); $('#nameForm').onsubmit = null; $('#nameCancel').onclick = null; d.onclose = null; resolve(v); };
+      $('#nameForm').onsubmit = (e) => { e.preventDefault(); const v = $('#nameInput').value.trim(); if (v) done(v); };
+      $('#nameCancel').onclick = () => done(null);
+      d.onclose = () => resolve(null);
+      d.showModal(); $('#nameInput').select();
+    });
+  }
+
+  const planActions = {
+    async new() { const n = await askName('New service plan', uniqueName('Untitled plan'), 'Create'); if (!n) return; const p = { id: newPlanId(), name: n, items: [], updatedAt: Date.now() }; S.plans.plans.push(p); switchPlan(p.id); },
+    async duplicate() { const n = await askName('Duplicate plan', uniqueName(S.plan.name + ' copy'), 'Duplicate'); if (!n) return; const p = { id: newPlanId(), name: n, items: S.plan.items.slice(), updatedAt: Date.now() }; S.plans.plans.push(p); switchPlan(p.id); },
+    async rename() { const n = await askName('Rename plan', S.plan.name, 'Rename'); if (!n) return; S.plan.name = n; savePlans(); renderPlanBtn(); },
+    async remove() {
+      if (S.plans.plans.length < 2) { toast('You need at least one plan'); return; }
+      if (!confirm('Delete the plan “' + S.plan.name + '”? Songs stay in your library.')) return;
+      const i = S.plans.plans.indexOf(S.plan);
+      S.plans.plans.splice(i, 1);
+      switchPlan(S.plans.plans[Math.max(0, i - 1)].id);
+    },
+  };
+
+  // dropdown menu, styled like the selects
+  let planMenu = null;
+  function closePlanMenu() {
+    if (!planMenu) return;
+    const m = planMenu; planMenu = null;
+    document.removeEventListener('mousedown', m.onDown, true);
+    document.removeEventListener('keydown', m.onKey, true);
+    window.removeEventListener('resize', closePlanMenu);
+    $('#planBtn').setAttribute('aria-expanded', 'false');
+    m.el.classList.remove('open'); setTimeout(() => m.el.remove(), 120);
+  }
+  function openPlanMenu(viaKey) {
+    if (planMenu) { closePlanMenu(); return; }
+    const btn = $('#planBtn');
+    const el = document.createElement('div');
+    el.className = 'ui-select-content plan-menu'; el.setAttribute('role', 'menu'); el.id = 'planMenu';
+    const sorted = S.plans.plans.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    let html = '<div class="menu-label">Service plans</div>';
+    html += sorted.map((p) => '<div class="ui-select-item" role="menuitemradio" aria-checked="' + (p.id === S.plan.id) + '" data-plan="' + esc(p.id) + '">'
+      + '<span class="ui-select-label plan-name">' + esc(p.name) + '</span><span class="menu-meta">' + p.items.length + (p.items.length === 1 ? ' song' : ' songs') + '</span>'
+      + '<span class="ui-check">' + (p.id === S.plan.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>' : '') + '</span></div>').join('');
+    const ic = (d) => '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+    html += '<div class="menu-sep" role="separator"></div>'
+      + '<div class="ui-select-item menu-action" role="menuitem" data-act="new">' + ic('<path d="M12 5v14M5 12h14"/>') + 'New plan</div>'
+      + '<div class="ui-select-item menu-action" role="menuitem" data-act="duplicate">' + ic('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>') + 'Duplicate “' + esc(S.plan.name) + '”</div>'
+      + '<div class="ui-select-item menu-action" role="menuitem" data-act="rename">' + ic('<path d="M12 20h9"/><path d="M16.4 3.6a2 2 0 0 1 3 3L7 19l-4 1 1-4z"/>') + 'Rename</div>'
+      + '<div class="ui-select-item menu-action danger" role="menuitem" data-act="remove">' + ic('<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>') + 'Delete plan</div>';
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    const r = btn.getBoundingClientRect();
+    el.style.top = (r.bottom + 4) + 'px'; el.style.left = r.left + 'px'; el.style.minWidth = Math.max(260, r.width) + 'px';
+    el.style.maxHeight = Math.max(160, innerHeight - r.bottom - 16) + 'px';
+    btn.setAttribute('aria-expanded', 'true');
+    const items = Array.from(el.querySelectorAll('.ui-select-item'));
+    let active = Math.max(0, items.findIndex((x) => x.dataset.plan === S.plan.id));
+    const hl = () => items.forEach((x, i) => x.classList.toggle('active', i === active));
+    if (viaKey) hl();
+    const pick = (it) => { closePlanMenu(); if (it.dataset.plan) { if (it.dataset.plan !== S.plan.id) switchPlan(it.dataset.plan); } else planActions[it.dataset.act](); };
+    el.addEventListener('mousemove', (e) => { const it = e.target.closest('.ui-select-item'); if (it) { active = items.indexOf(it); hl(); } });
+    el.addEventListener('mousedown', (e) => e.preventDefault());
+    el.addEventListener('click', (e) => { const it = e.target.closest('.ui-select-item'); if (it) pick(it); });
+    const m = { el };
+    m.onDown = (e) => { if (!el.contains(e.target) && !btn.contains(e.target)) closePlanMenu(); };
+    m.onKey = (e) => {
+      const stop = () => { e.preventDefault(); e.stopPropagation(); };
+      if (e.key === 'ArrowDown') { stop(); active = Math.min(items.length - 1, active + 1); hl(); }
+      else if (e.key === 'ArrowUp') { stop(); active = Math.max(0, active - 1); hl(); }
+      else if (e.key === 'Enter' || e.key === ' ') { stop(); pick(items[active]); }
+      else if (e.key === 'Escape') { stop(); closePlanMenu(); btn.focus(); }
+      else if (e.key === 'Tab') closePlanMenu();
+      else stop();
+    };
+    document.addEventListener('mousedown', m.onDown, true);
+    document.addEventListener('keydown', m.onKey, true);
+    window.addEventListener('resize', closePlanMenu);
+    planMenu = m;
+    requestAnimationFrame(() => el.classList.add('open'));
+  }
+  $('#planBtn').addEventListener('click', () => openPlanMenu(false));
+  $('#planBtn').addEventListener('keydown', (e) => { if (!planMenu && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); openPlanMenu(true); } });
+  renderPlanBtn();
 
   // ---------------- collapsible panels ----------------
   const panels = (() => { try { return JSON.parse(localStorage.getItem('gl-panels')) || {}; } catch (e) { return {}; } })();
