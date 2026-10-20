@@ -11,6 +11,10 @@
     "dist:mac": "electron-builder --mac"
   },
   "author": "Gabriel Ochai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EmperorGabi/gabilyrics.git"
+  },
   "license": "UNLICENSED",
   "devDependencies": {
     "electron": "^33.4.11",
@@ -30,18 +34,31 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "src/assets/icon.ico"
+      "icon": "src/assets/icon.ico",
+      "artifactName": "Gabilyrics-Setup-${version}.${ext}"
     },
     "mac": {
       "target": "dmg",
       "category": "public.app-category.video",
-      "icon": "src/assets/icon.png"
+      "icon": "src/assets/icon.png",
+      "artifactName": "Gabilyrics-${version}-${arch}.${ext}"
     },
     "linux": {
       "target": "AppImage",
       "icon": "src/assets/icon.png"
     },
-    "copyright": "Copyright © 2026 Gabriel Ochai"
+    "copyright": "Copyright © 2026 Gabriel Ochai",
+    "afterPack": "build/adhoc-sign.js",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Gabilyrics"
+    }
   },
   "dependencies": {
     "grandi": "2.0.2"
