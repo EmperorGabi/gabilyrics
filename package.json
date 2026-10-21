@@ -35,13 +35,13 @@
     "win": {
       "target": "nsis",
       "icon": "src/assets/icon.ico",
-      "artifactName": "Gabilyrics-Setup-${version}.${ext}"
+      "artifactName": "Gabilyrics-Setup.${ext}"
     },
     "mac": {
       "target": "dmg",
       "category": "public.app-category.video",
       "icon": "src/assets/icon.png",
-      "artifactName": "Gabilyrics-${version}-${arch}.${ext}"
+      "artifactName": "Gabilyrics-mac-${arch}.${ext}"
     },
     "linux": {
       "target": "AppImage",

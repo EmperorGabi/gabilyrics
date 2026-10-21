@@ -2,8 +2,22 @@
 
 A desktop app for showing song lyrics at live events, church services and livestreams.
 
+## Download
+
+| Windows | Mac (Apple Silicon: M1–M4) | Mac (Intel) |
+|---|---|---|
+| [**Download for Windows**](https://github.com/EmperorGabi/gabilyrics/releases/latest/download/Gabilyrics-Setup.exe) | [**Download for Mac (Apple Silicon)**](https://github.com/EmperorGabi/gabilyrics/releases/latest/download/Gabilyrics-mac-arm64.dmg) | [**Download for Mac (Intel)**](https://github.com/EmperorGabi/gabilyrics/releases/latest/download/Gabilyrics-mac-x64.dmg) |
+
+All versions and release notes: [Releases](https://github.com/EmperorGabi/gabilyrics/releases/latest).
+
+**First launch:** the app isn't code-signed yet.
+- **Windows:** if SmartScreen says "Windows protected your PC", click **More info → Run anyway**.
+- **Mac:** open the `.dmg`, drag Gabilyrics to Applications, then **right-click the app → Open → Open** the first time.
+
+> Not sure which Mac you have? Apple menu → **About This Mac**: "Chip: Apple M…" means Apple Silicon, "Processor: Intel" means Intel.
+
 - **Instant search**: searches song titles and every line of the lyrics in your local library as you type (well under 1 ms for normal libraries, a few ms at 10,000 songs).
-- **Online search**: runs only when nothing local matches (or when you press *Also search online*). Results come from [LRCLIB](https://lrclib.net), which is free and needs no key. Save a result to your library with one click. Songs you send live from the web are saved automatically, so next time they come from your library, even offline.
+- **Online search**: runs only when nothing local matches (or when you press *Also search online*). Results come from free sources searched at the same time: Genius (finds songs from a line of the lyrics, needs a free token), LRCLIB, Hymnary.org and lyrics.ovh. Save a result to your library with one click. Songs you send live from the web are saved automatically, so next time they come from your library, even offline.
 - **Lower third or full screen**: switch with one click (or `L` / `F`). Lower thirds split each slide into pages of 2 lines (you can change this).
 - **Outputs**:
   - **NDI Program**: follows the operator's style; transparent background in lower-third mode.
@@ -30,6 +44,17 @@ npm run dist:mac   # macOS .dmg               (run on a Mac)
 ```
 
 The installer is written to `dist/`.
+
+### Publishing a new version
+
+GitHub builds Windows and Mac installers automatically (`.github/workflows/build.yml`). To publish a version that people can download from the links above:
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+After about 15 minutes the new release is live and the download links point to it.
 
 ## NDI
 
