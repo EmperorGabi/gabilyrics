@@ -1,8 +1,8 @@
 # Builds Gabilyrics for Windows and macOS on GitHub's machines.
 #
 #  • Every push to main / pull request → installers are attached to the run as downloadable "artifacts".
-#  • Pushing a version tag (e.g. v1.2.0) → also creates a draft GitHub Release with the installers,
-#    using the tag as the app version.
+#  • Pushing a version tag (e.g. v1.2.0) → also publishes a GitHub Release with the installers,
+#    using the tag as the app version. The README's download links always point at the newest one.
 #  • You can also start it by hand: Actions tab → Build → Run workflow.
 name: Build
 
@@ -70,7 +70,7 @@ jobs:
           retention-days: 14
 
   release:
-    name: Draft release
+    name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
@@ -83,5 +83,6 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: installers/*
-          draft: true
+          draft: false          # published immediately, so the README download links work
+          make_latest: true
           generate_release_notes: true
