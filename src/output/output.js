@@ -33,6 +33,18 @@
     return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + (pct / 100) + ')';
   }
 
+  // Shadow and outline. Outline is drawn behind the letters (paint-order) so it grows outward
+  // and never thins the text; the stroke is doubled because half of it is hidden under the fill.
+  function applyEffects(el, o, u) {
+    const n = (v, d) => (v === undefined || v === null || v === '' || isNaN(Number(v)) ? d : Number(v));
+    el.style.textShadow = o.shadow
+      ? (n(o.shadowX, 0) * u) + 'px ' + (n(o.shadowY, 2) * u) + 'px ' + (n(o.shadowBlur, 8) * u) + 'px ' + hexA(o.shadowColor || '#000000', n(o.shadowOpacity, 80))
+      : 'none';
+    const w = o.outline ? n(o.outlineWidth, 2) : 0;
+    el.style.webkitTextStroke = w > 0 ? (w * 2 * u) + 'px ' + (o.outlineColor || '#000000') : '0';
+    el.style.paintOrder = 'stroke fill';
+  }
+
   function fit(el, startPx, minPx) {
     const u = unit();
     let size = startPx;
@@ -76,7 +88,8 @@
     }
 
     // ----- styles -----
-    full.classList.toggle('shadow', !!F.shadow);
+    applyEffects(fullTxt, F, u);
+    applyEffects(lowerTxt, L, u);
     fullTxt.style.fontFamily = F.font; fullTxt.style.fontWeight = F.weight; fullTxt.style.color = F.color;
     lower.style.left = (L.side * u) + 'px'; lower.style.right = (L.side * u) + 'px'; lower.style.bottom = (L.bottom * u) + 'px';
     lowerBox.style.background = hexA(L.boxColor, L.boxOpacity ?? 82);
@@ -123,10 +136,13 @@
     } else apply();
   }
 
+  // Live updates over a WebSocket; reconnects automatically if the app restarts.
   function connect() {
-    const es = new EventSource('/events');
-    es.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch (err) { console.error(err); } };
-    es.onerror = () => { /* EventSource reconnects automatically */ };
+    let ws;
+    try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); }
+    catch (e) { setTimeout(connect, 1000); return; }
+    ws.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+    ws.onclose = () => setTimeout(connect, 1000);
   }
   unit();
   connect();

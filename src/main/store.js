@@ -13,10 +13,15 @@ const DEFAULT_SETTINGS = {
     font: 'Segoe UI, Helvetica Neue, Arial, sans-serif', size: 44, weight: 600, color: '#FFFFFF',
     boxColor: '#080A0E', boxOpacity: 82, bottom: 64, side: 120, linesPerPage: 2, orphan: 'own',
     showTitle: 'first', accent: '#F5A524', uppercase: false,
+    // text effects (px at 1080p)
+    shadow: false, shadowColor: '#000000', shadowOpacity: 80, shadowBlur: 8, shadowX: 0, shadowY: 2,
+    outline: false, outlineColor: '#000000', outlineWidth: 2,
   },
   full: {
     font: 'Segoe UI, Helvetica Neue, Arial, sans-serif', size: 72, weight: 700, color: '#FFFFFF',
-    bg: '#000000', bgImage: '', bgDim: 40, credit: 'full', licence: '', shadow: true,
+    bg: '#000000', bgImage: '', bgDim: 40, credit: 'full', licence: '',
+    shadow: true, shadowColor: '#000000', shadowOpacity: 60, shadowBlur: 12, shadowX: 0, shadowY: 3,
+    outline: false, outlineColor: '#000000', outlineWidth: 3,
   },
   search: { autoOnline: true, cacheOnline: true, sources: { genius: true, lrclib: true, hymnary: true, lyricsovh: true }, geniusToken: '' },
   server: { port: 7380, lan: false },

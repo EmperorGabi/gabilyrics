@@ -188,6 +188,21 @@
           <label>Tag color<input type="color" data-k="lower.accent"></label>
           <label class="row between check">UPPERCASE<input type="checkbox" data-k="lower.uppercase"></label>
         </div>
+          <div class="fx">
+            <label class="row between check"><span><b>Shadow</b></span><input type="checkbox" data-k="lower.shadow"></label>
+            <div class="fx-grid">
+              <label>Color<input type="color" data-k="lower.shadowColor"></label>
+              <label>Opacity (%)<input type="range" min="0" max="100" data-k="lower.shadowOpacity" data-num></label>
+              <label>Blur<input type="number" min="0" max="60" data-k="lower.shadowBlur" data-num></label>
+              <label>Offset X<input type="number" min="-30" max="30" data-k="lower.shadowX" data-num></label>
+              <label>Offset Y<input type="number" min="-30" max="30" data-k="lower.shadowY" data-num></label>
+            </div>
+            <label class="row between check"><span><b>Outline</b></span><input type="checkbox" data-k="lower.outline"></label>
+            <div class="fx-grid">
+              <label>Color<input type="color" data-k="lower.outlineColor"></label>
+              <label>Thickness<input type="number" min="1" max="12" step="0.5" data-k="lower.outlineWidth" data-num></label>
+            </div>
+          </div>
       </div>
       <div class="field">
         <span class="eyebrow">Preview over camera</span>
@@ -208,8 +223,22 @@
           <label>Darken image (%)<input type="range" min="0" max="90" data-k="full.bgDim" data-num></label>
           <label>Credit line<select data-k="full.credit"><option value="full">Title, author &amp; licence</option><option value="title">Title only</option><option value="off">Off</option></select></label>
           <label>Licence number<input type="text" data-k="full.licence" placeholder="e.g. your CCLI number"></label>
-          <label class="row between check">Text shadow<input type="checkbox" data-k="full.shadow"></label>
         </div>
+          <div class="fx">
+            <label class="row between check"><span><b>Shadow</b></span><input type="checkbox" data-k="full.shadow"></label>
+            <div class="fx-grid">
+              <label>Color<input type="color" data-k="full.shadowColor"></label>
+              <label>Opacity (%)<input type="range" min="0" max="100" data-k="full.shadowOpacity" data-num></label>
+              <label>Blur<input type="number" min="0" max="60" data-k="full.shadowBlur" data-num></label>
+              <label>Offset X<input type="number" min="-30" max="30" data-k="full.shadowX" data-num></label>
+              <label>Offset Y<input type="number" min="-30" max="30" data-k="full.shadowY" data-num></label>
+            </div>
+            <label class="row between check"><span><b>Outline</b></span><input type="checkbox" data-k="full.outline"></label>
+            <div class="fx-grid">
+              <label>Color<input type="color" data-k="full.outlineColor"></label>
+              <label>Thickness<input type="number" min="1" max="12" step="0.5" data-k="full.outlineWidth" data-num></label>
+            </div>
+          </div>
       </div>
       <div class="field">
         <span class="eyebrow">Preview</span>
