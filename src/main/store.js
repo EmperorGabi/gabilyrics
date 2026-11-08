@@ -6,13 +6,15 @@ const seed = require('./seed');
 const DEFAULT_SETTINGS = {
   outputs: {
     ndiProgram: { enabled: true, name: 'GABILYRICS (Program)', style: 'follow', width: 1920, height: 1080, fps: 30 },
-    ndiKey: { enabled: true, name: 'GABILYRICS (Lower third)', style: 'lower', width: 1920, height: 1080, fps: 30 },
+    // follows the operator too, so the source keyed over the camera can also go full screen (e.g. camera fails)
+    ndiKey: { enabled: true, name: 'GABILYRICS (Lower third)', style: 'follow', width: 1920, height: 1080, fps: 30 },
     projector: { enabled: false, displayId: null, style: 'full' },
   },
   lower: {
     font: 'Segoe UI, Helvetica Neue, Arial, sans-serif', size: 44, weight: 600, color: '#FFFFFF',
     boxColor: '#080A0E', boxOpacity: 82, bottom: 64, side: 120, linesPerPage: 2, orphan: 'own',
     showTitle: 'first', accent: '#F5A524', uppercase: false,
+    boxPadX: 40, boxPadY: 20, boxRadius: 10,
     // text effects (px at 1080p)
     shadow: false, shadowColor: '#000000', shadowOpacity: 80, shadowBlur: 8, shadowX: 0, shadowY: 2,
     outline: false, outlineColor: '#000000', outlineWidth: 2,
@@ -25,7 +27,14 @@ const DEFAULT_SETTINGS = {
   },
   search: { autoOnline: true, cacheOnline: true, sources: { genius: true, lrclib: true, hymnary: true, lyricsovh: true }, geniusToken: '' },
   server: { port: 7380, lan: false },
-  transition: 200,
+  // text rules: words always spelt this way (any case, whole word), find/replace pairs, capitalise each line
+  text: { words: ['God', 'Jesus', 'Christ'], replacements: [], capFirst: false },
+  // share this computer's song library with other Gabilyrics computers on the local network
+  sharing: { enabled: false, name: '', id: '' },
+  transition: 200,                 // ms for changing words
+  transitionType: 'fade',          // cut | fade | slideUp | slideDown | slideLeft | zoom | blur
+  transitionEasing: 'ease',        // ease | linear | ease-in-out | ease-out
+  modeTransition: 500,             // ms for lower third ↔ full screen (background fades in/out)
   theme: 'dark',
 };
 
@@ -50,6 +59,7 @@ class Store {
     this.library = this._read(this.files.library, null);
     if (!Array.isArray(this.library)) { this.library = seed(); this._write('library'); }
     this.settings = deepMerge(DEFAULT_SETTINGS, this._read(this.files.settings, {}));
+    this._migrate();
     // Several saved service plans; one is current. Migrates the single plan.json from earlier versions.
     this.plans = this._read(this.files.plans, null);
     if (!this.plans || !Array.isArray(this.plans.plans) || !this.plans.plans.length) {
@@ -61,6 +71,20 @@ class Store {
     }
     if (!this.plans.plans.some((p) => p.id === this.plans.current)) this.plans.current = this.plans.plans[0].id;
     this._timers = {};
+  }
+
+  // One-time upgrades of saved settings from older versions.
+  _migrate() {
+    const st = this.settings;
+    let changed = false;
+    if (!st.settingsVersion || st.settingsVersion < 2) {
+      // v2: the lower-third NDI source follows the Lower third / Full screen switch, so switching to
+      // full screen works without adding another source in OBS / vMix.
+      if (st.outputs && st.outputs.ndiKey && st.outputs.ndiKey.style === 'lower') st.outputs.ndiKey.style = 'follow';
+      st.settingsVersion = 2; changed = true;
+    }
+    if (!st.sharing.id) { st.sharing.id = require('crypto').randomUUID(); changed = true; }
+    if (changed) this._write('settings');
   }
 
   _read(file, fallback) {

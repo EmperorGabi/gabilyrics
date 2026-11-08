@@ -54,6 +54,7 @@
     <div class="tabs" role="tablist">
       <button type="button" role="tab" id="tabPlan" aria-selected="true">Service plan</button>
       <button type="button" role="tab" id="tabLib" aria-selected="false">Library</button>
+      <button type="button" role="tab" id="tabNet" aria-selected="false" title="Song libraries shared by other Gabilyrics computers on this network">Network</button>
     </div>
     <div id="list" class="list"></div>
     <div class="row gap8 bottom">
@@ -143,14 +144,14 @@
           <div class="small ndi-state" data-ndi="ndiProgram"></div>
         </article>
         <article class="card">
-          <div class="row between"><b><span class="badge">NDI</span> Lower-third key</b><label class="switch"><input type="checkbox" data-k="outputs.ndiKey.enabled"><span></span></label></div>
+          <div class="row between"><b><span class="badge">NDI</span> Overlay (lower third / full)</b><label class="switch"><input type="checkbox" data-k="outputs.ndiKey.enabled"><span></span></label></div>
           <label>Source name<input type="text" data-k="outputs.ndiKey.name"></label>
-          <label>Style<select data-k="outputs.ndiKey.style"><option value="lower">Lower third only</option><option value="follow">Follow operator</option><option value="full">Full screen only</option></select></label>
+          <label>Style<select data-k="outputs.ndiKey.style"><option value="follow">Follow operator</option><option value="lower">Lower third only</option><option value="full">Full screen only</option></select></label>
           <div class="grid2">
             <label>Resolution<select data-k="outputs.ndiKey.res" data-res><option>1920x1080</option><option>3840x2160</option><option>1280x720</option></select></label>
             <label>Frame rate<select data-k="outputs.ndiKey.fps" data-num><option>30</option><option>60</option><option>25</option><option>50</option></select></label>
           </div>
-          <div class="small muted">Lower thirds are sent with a transparent (alpha) background, ready to key over cameras.</div>
+          <div class="small muted">Lower thirds are sent with a transparent (alpha) background, ready to key over cameras. On <b>Follow operator</b>, pressing Full screen fills this same source with the full-screen background — handy if a camera fails — so nothing needs changing in OBS / vMix.</div>
           <div class="small ndi-state" data-ndi="ndiKey"></div>
         </article>
         <article class="card">
@@ -182,6 +183,9 @@
           <label>Text color<input type="color" data-k="lower.color"></label>
           <label>Box color<input type="color" data-k="lower.boxColor"></label>
           <label>Box opacity (%)<input type="range" min="0" max="100" data-k="lower.boxOpacity" data-num></label>
+          <label>Box padding — sides<input type="number" min="0" max="300" data-k="lower.boxPadX" data-num></label>
+          <label>Box padding — top &amp; bottom<input type="number" min="0" max="200" data-k="lower.boxPadY" data-num></label>
+          <label>Box corner radius<input type="number" min="0" max="80" data-k="lower.boxRadius" data-num></label>
           <label>Bottom margin<input type="number" min="0" max="500" data-k="lower.bottom" data-num></label>
           <label>Side margin<input type="number" min="0" max="700" data-k="lower.side" data-num></label>
           <label>Song title tag<select data-k="lower.showTitle"><option value="first">On first slide</option><option value="always">Always</option><option value="never">Never</option></select></label>
@@ -246,8 +250,50 @@
       </div>
     </section>
 
+    <section class="split" id="transitionsSection">
+      <div>
+        <h2>Transitions</h2>
+        <div class="grid2">
+          <label>Style<select data-k="transitionType"><option value="fade">Fade</option><option value="slideUp">Slide up</option><option value="slideDown">Slide down</option><option value="slideLeft">Slide in from right</option><option value="zoom">Zoom</option><option value="blur">Blur</option><option value="cut">Cut (instant)</option></select></label>
+          <label>Easing<select data-k="transitionEasing"><option value="ease">Smooth</option><option value="ease-in-out">Smooth in &amp; out</option><option value="ease-out">Fast start</option><option value="linear">Linear</option></select></label>
+          <label>Changing words (ms)<input type="number" min="0" max="3000" step="50" data-k="transition" data-num></label>
+          <label>Lower third ↔ full screen (ms)<input type="number" min="0" max="5000" step="50" data-k="modeTransition" data-num></label>
+        </div>
+        <p class="small muted" style="margin-top:10px">Changing words: the old words go out and the new ones come in with this style. Switching between lower third and full screen also fades the full-screen background in or out.</p>
+        <button class="btn" type="button" id="previewFx"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 4 14 8-14 8z"/></svg>Preview transition</button>
+      </div>
+      <div class="field">
+        <span class="eyebrow">Text rules</span>
+        <div class="panel">
+          <div class="field">
+            <span><b>Always spell these words like this</b><br><span class="small muted">Matched as whole words in any case — “god”, “GOD” and “god’s” become “God”, “God’s”. “goddess” is left alone.</span></span>
+            <div class="chips" id="ruleWords"></div>
+            <form class="row gap8" id="ruleWordForm"><input type="text" id="ruleWordInput" placeholder="Add a word, e.g. Holy Spirit" maxlength="60" style="flex:1"><button class="btn" type="submit">Add</button></form>
+          </div>
+          <div class="field">
+            <span><b>Replace</b><br><span class="small muted">Whole words, any case. Example: “thru” → “through”.</span></span>
+            <div id="ruleReplacements" class="rule-rows"></div>
+            <form class="row gap8" id="ruleRepForm"><input type="text" id="ruleFind" placeholder="Find" maxlength="60" style="flex:1"><span class="muted">→</span><input type="text" id="ruleReplace" placeholder="Replace with" maxlength="80" style="flex:1"><button class="btn" type="submit">Add</button></form>
+          </div>
+          <label class="row between check"><span><b>Capitalise the first letter of every line</b></span><input type="checkbox" data-k="text.capFirst"></label>
+          <div class="small muted" id="ruleExample"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sharingSection">
+      <h2>Share songs on this network</h2>
+      <div class="panel">
+        <label class="row between check"><span><b>Share my song library with other Gabilyrics computers</b><br><span class="small muted">They can search your songs and copy them into their own library. Read-only — nobody can change or delete your songs. Only computers on the same local network can see it.</span></span><input type="checkbox" data-k="sharing.enabled"></label>
+        <label>This computer’s name on the network<input type="text" data-k="sharing.name" id="shareName" maxlength="60"></label>
+        <div class="small" id="shareStatus"></div>
+        <div class="field"><span><b>Computers sharing with you</b></span><div id="peerSummary" class="small muted"></div></div>
+      </div>
+      <p class="small muted">Turn sharing on for each computer that should offer its songs. Windows may ask to allow Gabilyrics through the firewall: allow it on <b>private networks</b>.</p>
+    </section>
+
     <section>
-      <h2>Search, library &amp; transitions</h2>
+      <h2>Search &amp; library</h2>
       <div class="panel">
         <label class="row between check"><span><b>Search online when there's no local match</b><br><span class="small muted">Your library is always searched first, instantly, as you type.</span></span><input type="checkbox" data-k="search.autoOnline"></label>
         <div class="sources">
@@ -258,8 +304,7 @@
           <label class="row between check"><span>Hymnary.org <span class="small muted">— hymns by title or any line; words for public-domain hymns</span></span><input type="checkbox" data-k="search.sources.hymnary"></label>
           <label class="row between check"><span>lyrics.ovh <span class="small muted">— song title / artist</span></span><input type="checkbox" data-k="search.sources.lyricsovh"></label>
         </div>
-        <label class="row between check"><span><b>Save online songs when they go live</b><br><span class="small muted">Next time they come from your library, even offline.</span></span><input type="checkbox" data-k="search.cacheOnline"></label>
-        <label class="row between check"><span><b>Fade between slides (ms)</b></span><input type="number" min="0" max="2000" step="50" data-k="transition" data-num style="max-width:120px"></label>
+        <label class="row between check"><span><b>Save online and network songs when they go live</b><br><span class="small muted">Next time they come from your library, even offline.</span></span><input type="checkbox" data-k="search.cacheOnline"></label>
         <div class="row between wrap gap8"><span><b>Library</b><br><span class="small muted" id="dataDir"></span></span>
           <span class="row gap8 wrap"><button class="btn" type="button" id="importBtn2">Import songs…</button><button class="btn" type="button" id="exportBtn">Export library</button><button class="btn ghost" type="button" id="openData">Open data folder</button></span></div>
       </div>
@@ -312,6 +357,7 @@
 
 <script src="../shared/lyrics.js"></script>
 <script src="../shared/search.js"></script>
+<script src="../shared/textrules.js"></script>
 <script src="ui-select.js"></script>
 <script src="app.js"></script>
 </body>

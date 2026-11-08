@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('vc', {
   openData: call('open:data'),
   openUrl: call('open:url'),
   onStatus: (cb) => ipcRenderer.on('status', (_e, s) => cb(s)),
+  peers: { list: call('peers:list'), onChange: (cb) => ipcRenderer.on('peers', (_e, p) => cb(p)) },
 });

@@ -22,6 +22,8 @@
     query: '', local: [], localMs: 0,
     online: { state: 'idle', query: '', results: [], ms: 0, error: null }, forceOnline: false,
     temp: {},              // online songs being previewed (not saved yet)
+    peers: [], netSongs: {}, netIndex: new SongSearch.Index(), netRes: [], openPeer: null,   // songs shared by other computers
+    rules: TextRules.compile({}),
     selectedId: null, tab: 'plan',
     live: { songId: null, line: 0 }, mode: 'lower', blank: true,
     kb: -1,
@@ -29,17 +31,32 @@
     groupVerses: (() => { try { return localStorage.getItem('gl-group') === '1'; } catch (e) { return false; } })(),                // keyboard-highlighted search result
   };
 
-  const getSong = (id) => S.songs.find((s) => s.id === id) || S.temp[id] || null;
+  const getSong = (id) => S.songs.find((s) => s.id === id) || S.temp[id] || S.netSongs[id] || null;
+  const isTemp = (song) => !!song && (song.source === 'online-temp' || song.source === 'network-temp');
+  const songKey = (title, author) => SongSearch.norm(title) + '|' + SongSearch.norm(author);
+
+  // The song as it will appear on screen: text rules applied (always "God", replacements, capitals).
+  // Rules never change the number of lines, so line positions match the stored song.
+  const shownCache = new WeakMap();
+  function shown(song) {
+    if (!song) return song;
+    const hit = shownCache.get(song);
+    if (hit && hit.sig === S.rules.sig) return hit.v;
+    const v = Object.assign({}, song, { slides: song.slides.map((sl) => ({ label: sl.label, text: TextRules.apply(sl.text, S.rules) })) });
+    shownCache.set(song, { sig: S.rules.sig, v });
+    return v;
+  }
   const reindex = () => { S.index.build(S.songs); };
 
-  function toast(msg) {
+  function toast(msg, ms) {
     const t = $('#toast'); t.textContent = msg; t.classList.add('on');
-    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2200);
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms || 2200);
   }
 
   // ---------------- boot ----------------
   [S.songs, S.plans, S.settings, S.info] = await Promise.all([vc.library.all(), vc.plans.get(), vc.settings.get(), vc.info()]);
   S.plan = S.plans.plans.find((p) => p.id === S.plans.current) || S.plans.plans[0];
+  S.rules = TextRules.compile(S.settings.text);
   reindex();
   S.selectedId = S.plan.items.find((id) => getSong(id)) || (S.songs[0] && S.songs[0].id) || null;
   applyTheme(S.settings.theme || 'dark');
@@ -96,7 +113,7 @@
   }
 
   function pushLive() {
-    const song = getSong(S.live.songId);
+    const song = shown(getSong(S.live.songId));
     const payload = { mode: S.mode, blank: S.blank, song: null, label: '', text: '', page: '', lower: '', first: false, next: null };
     const sc = song && song.slides.length ? screenAt(song, S.live.line) : null;
     if (sc) {
@@ -113,7 +130,7 @@
       }
     } else {
       // nothing live yet: preview shows the selected song's first screen
-      const sel = getSong(S.selectedId);
+      const sel = shown(getSong(S.selectedId));
       const c = cardsOf(sel)[0];
       if (c) payload.next = { label: cardLabel(c), text: sel.slides[c.slide].text, page: c.text, lower: cardsOf(sel, 'lower')[0].text, first: true };
     }
@@ -124,7 +141,7 @@
   async function goLive(songId, line) {
     let song = getSong(songId);
     if (!song) return;
-    if (song.source === 'online-temp' && S.settings.search.cacheOnline) song = await saveOnline(song, true);
+    if (isTemp(song) && S.settings.search.cacheOnline) song = await saveOnline(song, true);
     S.live = { songId: song.id, line: line || 0 };
     S.blank = false;
     pushLive(); renderSlides(); renderList();
@@ -132,7 +149,7 @@
 
   function step(dir) {
     if (!S.live.songId) { const sel = getSong(S.selectedId); if (sel && sel.slides.length) goLive(sel.id, 0); return; }
-    const song = getSong(S.live.songId);
+    const song = shown(getSong(S.live.songId));
     const g = song ? (dir > 0 ? nextG(song, S.live.line) : prevG(song, S.live.line)) : null;
     if (g == null) { toast(dir > 0 ? 'End of song' : 'Start of song'); return; }
     S.live.line = g; S.blank = false; pushLive(); renderSlides();
@@ -146,6 +163,11 @@
     $('#railLower').setAttribute('aria-pressed', m === 'lower');
     $('#railFull').setAttribute('aria-pressed', m === 'full');
     pushLive(); renderSlides();
+    // outputs locked to the other style won't change — say so, so nobody is caught out live
+    const o = S.settings.outputs;
+    const locked = [['ndiProgram', 'NDI ' + o.ndiProgram.name], ['ndiKey', 'NDI ' + o.ndiKey.name], ['projector', 'Projector']]
+      .filter(([k]) => o[k].enabled && o[k].style !== 'follow' && o[k].style !== m).map(([, n]) => n);
+    if (locked.length) toast('Not switched (locked in Settings → Outputs): ' + locked.join(', '), 6000);
   }
 
   function toggleBlank() { S.blank = !S.blank; pushLive(); }
@@ -156,10 +178,11 @@
     S.query = q; S.kb = -1;
     const t0 = performance.now();
     S.local = S.index.search(q, 40);
+    S.netRes = S.netIndex.search(q, 20);
     S.localMs = performance.now() - t0;
     clearTimeout(onlineTimer);
     const qq = q.trim();
-    if (qq.length >= 2 && (S.forceOnline || (S.local.length === 0 && S.settings.search.autoOnline))) {
+    if (qq.length >= 2 && (S.forceOnline || (S.local.length === 0 && S.netRes.length === 0 && S.settings.search.autoOnline))) {
       if (S.online.query !== qq || S.online.state === 'error') {
         S.online = { state: 'loading', query: qq, results: [], ms: 0, error: null };
         onlineTimer = setTimeout(() => fetchOnline(qq), 280);
@@ -190,15 +213,19 @@
     return S.temp[id];
   }
 
-  async function saveOnline(song, quiet) {
-    const toSave = { title: song.title, author: song.author, copyright: song.copyright || '', source: 'online', remoteId: song.remoteId, slides: song.slides };
+  // Save a previewed online or network song into this computer's library.
+  async function saveOnline(song, quiet, noPlan) {
+    const fromNet = song.source === 'network-temp';
+    const toSave = { title: song.title, author: song.author, copyright: song.copyright || '', source: fromNet ? 'network' : 'online', remoteId: song.remoteId, slides: song.slides };
+    if (fromNet) toSave.sharedFrom = song.peerName;
     const saved = await vc.library.save(toSave);
     S.songs.push(saved); reindex();
     delete S.temp[song.id];
     if (S.selectedId === song.id) S.selectedId = saved.id;
     if (S.live.songId === song.id) S.live.songId = saved.id;
-    if (!S.plan.items.includes(saved.id)) { S.plan.items.push(saved.id); savePlans(); }
+    if (!noPlan && !S.plan.items.includes(saved.id)) { S.plan.items.push(saved.id); savePlans(); }
     S.online.results = S.online.results.filter((x) => x.remoteId !== song.remoteId);
+    if (fromNet) { delete S.netSongs[song.id]; setPeers(S.peers, true); }
     if (!quiet) toast('Saved “' + saved.title + '” to your library');
     renderAll();
     return saved;
@@ -214,6 +241,7 @@
     const showOnline = S.online.query === q && S.online.state !== 'idle';
     const status = S.local.length
       ? 'Found in your library' + (showOnline ? '' : ' — online search skipped')
+      : S.netRes.length ? 'Found on the network' + (showOnline ? '' : ' — online search skipped')
       : (S.settings.search.autoOnline ? 'Not in your library → searching online' : 'Not in your library');
     $('#searchStatus').textContent = status;
 
@@ -231,7 +259,20 @@
     });
     if (!S.local.length) h += '<div class="note">No match in your library.</div>';
 
-    if (!showOnline && S.local.length) {
+    if (S.netRes.length) {
+      h += '<div class="res-head"><span class="eyebrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>On the network</span><span class="ms">' + S.netRes.length + (S.netRes.length === 1 ? ' match' : ' matches') + '</span></div>';
+      S.netRes.slice(0, 8).forEach((r) => {
+        const s = r.song;
+        const title = r.kind === 'title' ? hl(s.title, q) : esc(s.title);
+        h += '<div class="res' + (s.id === S.selectedId ? ' sel' : '') + (n === S.kb ? ' kb' : '') + '" data-pick="' + esc(s.id) + '" data-n="' + n + '" role="button" tabindex="0"><span class="body"><span class="t">' + title + '</span>'
+          + (r.line ? '<span class="l">“' + hl(r.line, q) + '”</span>' : '')
+          + '<span class="m"><span>' + esc(s.author || '') + '</span><span class="k">' + esc(s.peerName) + '</span></span></span>'
+          + '<button type="button" class="btn primary small" data-netsave="' + esc(s.id) + '" aria-label="Save to library">+ Save</button></div>';
+        n++;
+      });
+    }
+
+    if (!showOnline && (S.local.length || S.netRes.length)) {
       h += '<button type="button" class="btn ghost" id="alsoOnline"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg>Also search online</button>';
     }
     if (showOnline) {
@@ -255,6 +296,8 @@
   }
 
   $('#results').addEventListener('click', (e) => {
+    const ns = e.target.closest('[data-netsave]');
+    if (ns) { e.stopPropagation(); const s = S.netSongs[ns.dataset.netsave]; if (s) saveOnline(s); return; }
     const save = e.target.closest('[data-save]');
     if (save) { e.stopPropagation(); const r = S.online.results.find((x) => x.remoteId === save.dataset.save); if (r) saveOnline(onlineToTemp(r)); return; }
     if (e.target.closest('#alsoOnline')) { S.forceOnline = true; runSearch(S.query); return; }
@@ -290,6 +333,9 @@
     $('#tabPlan').setAttribute('aria-selected', S.tab === 'plan');
     $('#tabLib').setAttribute('aria-selected', S.tab === 'library');
     $('#tabLib').textContent = 'Library (' + S.songs.length + ')';
+    $('#tabNet').setAttribute('aria-selected', S.tab === 'network');
+    $('#tabNet').textContent = 'Network' + (S.peers.length ? ' (' + S.peers.length + ')' : '');
+    if (S.tab === 'network') { renderNetwork(list); return; }
     const songs = S.tab === 'plan'
       ? S.plan.items.map(getSong).filter(Boolean)
       : S.songs.slice().sort((a, b) => a.title.localeCompare(b.title));
@@ -297,12 +343,18 @@
     list.innerHTML = songs.map((s, i) => '<div class="item' + (s.id === S.selectedId ? ' sel' : '') + '" role="button" tabindex="0" data-pick="' + esc(s.id) + '"'
       + (S.tab === 'plan' ? ' draggable="true" data-i="' + i + '"' : '') + '>'
       + '<span class="n">' + String(i + 1).padStart(2, '0') + '</span>'
-      + '<span class="b"><span class="t">' + esc(s.title) + '</span><span class="m">' + s.slides.length + ' slides · ' + esc(s.author || (s.source === 'online' ? 'Saved from online' : 'Local')) + '</span></span>'
+      + '<span class="b"><span class="t">' + esc(s.title) + '</span><span class="m">' + s.slides.length + ' slides · ' + esc(s.author || (s.source === 'online' ? 'Saved from online' : s.source === 'network' ? 'From ' + (s.sharedFrom || 'the network') : 'Local')) + '</span></span>'
       + (s.id === S.live.songId && !S.blank ? '<span class="livetag">LIVE</span>' : '')
       + (S.tab === 'plan' ? '<button type="button" class="x" data-remove="' + i + '" aria-label="Remove from plan">✕</button>' : '')
       + '</div>').join('');
   }
   $('#list').addEventListener('click', (e) => {
+    const peerBtn = e.target.closest('[data-peer]');
+    if (peerBtn) { S.openPeer = S.openPeer === peerBtn.dataset.peer ? null : peerBtn.dataset.peer; renderList(); return; }
+    const ns = e.target.closest('[data-netsave]');
+    if (ns) { e.stopPropagation(); const s = S.netSongs[ns.dataset.netsave]; if (s) saveOnline(s); return; }
+    const all = e.target.closest('[data-saveall]');
+    if (all) { e.stopPropagation(); saveAllFrom(all.dataset.saveall); return; }
     const rm = e.target.closest('[data-remove]');
     if (rm) { e.stopPropagation(); S.plan.items.splice(Number(rm.dataset.remove), 1); savePlans(); renderList(); return; }
     const p = e.target.closest('[data-pick]'); if (p) select(p.dataset.pick);
@@ -320,17 +372,73 @@
   $('#list').addEventListener('dragend', () => { dragFrom = null; $$('.item.drag-over').forEach((x) => x.classList.remove('drag-over')); });
   $('#tabPlan').onclick = () => { S.tab = 'plan'; renderList(); };
   $('#tabLib').onclick = () => { S.tab = 'library'; renderList(); };
+  $('#tabNet').onclick = () => { S.tab = 'network'; renderList(); };
+
+  // ---------------- songs shared by other computers on the network ----------------
+  function setPeers(peers, quiet) {
+    S.peers = peers || [];
+    const have = new Set(S.songs.map((s) => songKey(s.title, s.author)));
+    const net = {};
+    S.peers.forEach((p) => (p.songs || []).forEach((song) => {
+      if (have.has(songKey(song.title, song.author))) return;   // already in my library
+      const id = 'net:' + p.id + ':' + song.id;
+      net[id] = Object.assign({}, song, { id, source: 'network-temp', remoteId: 'net:' + song.id, peerName: p.name, peerId: p.id });
+    }));
+    S.netSongs = net;
+    S.netIndex.build(Object.values(net));
+    if (!quiet && S.query.trim()) runSearch(S.query);
+    renderList(); renderSharing();
+  }
+  function renderNetwork(list) {
+    if (!S.peers.length) {
+      list.innerHTML = '<div class="note">No other Gabilyrics computers are sharing on this network yet. Turn on <b>Share my song library</b> in Settings on the computers that should offer their songs.</div>';
+      return;
+    }
+    list.innerHTML = S.peers.map((p) => {
+      const songs = Object.values(S.netSongs).filter((s) => s.peerId === p.id).sort((a, b) => a.title.localeCompare(b.title));
+      const open = S.openPeer === p.id;
+      let h = '<div class="peer"><button type="button" class="peer-head" data-peer="' + esc(p.id) + '" aria-expanded="' + open + '">'
+        + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'
+        + '<span class="t">' + esc(p.name) + '</span><span class="small muted">' + (p.error ? 'unreachable' : songs.length + ' new · ' + (p.songs || []).length + ' total') + '</span></button>';
+      if (open) {
+        if (p.error) h += '<div class="netnote">Couldn’t load songs: ' + esc(p.error) + '</div>';
+        else if (!songs.length) h += '<div class="netnote">You already have all of these songs.</div>';
+        else {
+          h += '<button type="button" class="btn small" data-saveall="' + esc(p.id) + '">Save all ' + songs.length + ' to my library</button>';
+          h += songs.map((s) => '<div class="item' + (s.id === S.selectedId ? ' sel' : '') + '" role="button" tabindex="0" data-pick="' + esc(s.id) + '">'
+            + '<span class="b"><span class="t">' + esc(s.title) + '</span><span class="m">' + s.slides.length + ' slides · ' + esc(s.author || '') + '</span></span>'
+            + '<button type="button" class="btn small imp" data-netsave="' + esc(s.id) + '" aria-label="Save to my library">+ Save</button></div>').join('');
+        }
+      }
+      return h + '</div>';
+    }).join('');
+  }
+  async function saveAllFrom(peerId) {
+    const songs = Object.values(S.netSongs).filter((s) => s.peerId === peerId);
+    for (const s of songs) await saveOnline(s, true, true);
+    toast('Saved ' + songs.length + ' song' + (songs.length === 1 ? '' : 's') + ' to your library');
+  }
+  function renderSharing() {
+    const el = $('#peerSummary'); if (!el) return;
+    el.innerHTML = S.peers.length
+      ? S.peers.map((p) => esc(p.name) + ' — ' + (p.error ? 'unreachable (' + esc(p.error) + ')' : (p.songs || []).length + ' songs')).join('<br>')
+      : 'None found yet.';
+  }
+  vc.peers.onChange((p) => setPeers(p));
+  vc.peers.list().then((p) => setPeers(p, true));
 
   // ---------------- slides (cards = screens) ----------------
   function renderSlides() {
-    const song = getSong(S.selectedId);
+    const song = shown(getSong(S.selectedId));
     const grid = $('#slides');
-    $('#saveOnline').hidden = !(song && song.source === 'online-temp');
-    $('#editSong').hidden = !song || song.source === 'online-temp';
-    $('#addToPlan').hidden = !song || song.source === 'online-temp' || S.plan.items.includes(song.id);
+    $('#saveOnline').hidden = !isTemp(song);
+    $('#editSong').hidden = !song || isTemp(song);
+    $('#addToPlan').hidden = !song || isTemp(song) || S.plan.items.includes(song.id);
     if (!song) { $('#selTitle').textContent = 'No song selected'; $('#selMeta').textContent = 'Search or pick a song from the plan'; grid.innerHTML = ''; return; }
     $('#selTitle').textContent = song.title;
-    const src = song.source === 'online-temp' ? 'Online — preview, not saved yet' : song.source === 'online' ? 'Saved from online' : 'Local';
+    const src = song.source === 'online-temp' ? 'Online — preview, not saved yet'
+      : song.source === 'network-temp' ? 'On ' + song.peerName + ' — preview, not saved yet'
+      : song.source === 'online' ? 'Saved from online' : song.source === 'network' ? 'Copied from ' + (song.sharedFrom || 'the network') : 'Local';
     const cards = cardsOf(song);
     const split = cards.length !== song.slides.length;
     $('#selMeta').textContent = [song.author, song.slides.length + ' slides' + (split ? ' → ' + cards.length + ' screens of ' + linesPer('lower') + ' lines' : ''), src].filter(Boolean).join(' · ');
@@ -446,11 +554,11 @@
     const styleName = { follow: 'follows style', lower: 'lower third', full: 'full screen' };
     $('#statusPills').innerHTML =
       '<span class="pill"><i class="dot ' + ndiDot('ndiProgram') + '"></i>NDI · Program</span>'
-      + '<span class="pill"><i class="dot ' + ndiDot('ndiKey') + '"></i>NDI · Lower-third key</span>'
+      + '<span class="pill"><i class="dot ' + ndiDot('ndiKey') + '"></i>NDI · Overlay</span>'
       + '<span class="pill"><i class="dot ' + (o.projector.enabled ? (i.projector ? 'ok' : 'warn') : 'off') + '"></i>Projector</span>';
     $('#outList').innerHTML = [
       ['ndiProgram', 'NDI · ' + o.ndiProgram.name, ndiText('ndiProgram') + ' · ' + styleName[o.ndiProgram.style]],
-      ['ndiKey', 'NDI · ' + o.ndiKey.name, ndiText('ndiKey') + ' · alpha'],
+      ['ndiKey', 'NDI · ' + o.ndiKey.name, ndiText('ndiKey') + ' · ' + styleName[o.ndiKey.style] + (o.ndiKey.style === 'full' ? '' : ' · alpha')],
     ].map(([k, t, m]) => '<div class="out"><i class="dot ' + ndiDot(k) + '"></i><span class="b"><span class="t">' + esc(t) + '</span><span class="m">' + esc(m) + '</span></span></div>').join('')
       + '<div class="out"><i class="dot ' + (o.projector.enabled ? (i.projector ? 'ok' : 'warn') : 'off') + '"></i><span class="b"><span class="t">Projector</span><span class="m">' + (o.projector.enabled ? (i.projector ? 'On · ' + styleName[o.projector.style] : 'No screen found') : 'Off — turn on in settings') + '</span></span></div>'
       + '<div class="out"><i class="dot ok"></i><span class="b"><span class="t">Browser source</span><span class="m">' + esc(i.serverUrl) + '/output</span></span></div>';
@@ -465,6 +573,12 @@
       return '<div class="url"><code>' + esc(u) + '</code><button type="button" class="btn small" data-copy="' + esc(u) + '">Copy</button></div>';
     }).join('') + (i.lanUrls || []).map((b) => '<div class="url"><code>' + esc(b) + '/output?style=lower</code><button type="button" class="btn small" data-copy="' + esc(b) + '/output?style=lower">Copy</button></div>').join('');
     $('#dataDir').textContent = i.dataDir;
+    if (i.sharing) {
+      $('#shareName').placeholder = i.sharing.name;
+      $('#shareStatus').innerHTML = i.sharing.enabled
+        ? '<i class="dot ok"></i> Sharing on — other computers see “' + esc(i.sharing.name) + '”' + (i.sharing.ips.length ? ' at ' + esc(i.sharing.ips.join(', ')) : '') + ' · ' + S.songs.length + ' songs'
+        : '<i class="dot off"></i> Sharing is off. You can still use songs shared by other computers.';
+    }
     const ds = $('#displaySelect');
     const want = String(o.projector.displayId || '');
     ds.innerHTML = '<option value="">Auto (second screen)</option>' + i.displays.map((d) => '<option value="' + d.id + '"' + (String(d.id) === want ? ' selected' : '') + '>' + esc(d.label) + '</option>').join('');
@@ -516,7 +630,7 @@
   $('#newSong').onclick = () => openEditor(null);
   $('#editSong').onclick = () => { const s = getSong(S.selectedId); if (s) openEditor(s); };
   $('#addToPlan').onclick = () => { if (S.selectedId && !S.plan.items.includes(S.selectedId)) { S.plan.items.push(S.selectedId); savePlans(); toast('Added to plan'); renderList(); renderSlides(); } };
-  $('#saveOnline').onclick = () => { const s = getSong(S.selectedId); if (s && s.source === 'online-temp') saveOnline(s); };
+  $('#saveOnline').onclick = () => { const s = getSong(S.selectedId); if (isTemp(s)) saveOnline(s); };
   async function doImport() {
     const r = await vc.library.importFiles();
     if (r.added) { S.songs = await vc.library.all(); reindex(); renderAll(); toast('Imported ' + r.added + ' song' + (r.added === 1 ? '' : 's')); }
@@ -544,6 +658,7 @@
       if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : String(v);
     });
     UISelect.refresh();
+    renderRules(); renderSharing();
     $('#bgName').textContent = S.settings.full.bgImage ? S.settings.full.bgImage.split(/[\\/]/).pop() : 'None';
   }
   function setPath(obj, k, v) { const ps = k.split('.'); let o = obj; ps.slice(0, -1).forEach((p) => { o[p] = o[p] || {}; o = o[p]; }); o[ps[ps.length - 1]] = v; }
@@ -558,8 +673,48 @@
     }
     S.settings = await vc.settings.set(partial);
     if (/^lower\.(linesPerPage|orphan)/.test(k)) { pushLive(); renderSlides(); }
+    if (/^text\./.test(k)) rulesChanged();
     renderStatus();
   }
+
+  // ---------------- text rules ----------------
+  function rulesChanged() {
+    S.rules = TextRules.compile(S.settings.text);
+    renderRules(); pushLive(); renderSlides();
+  }
+  async function saveText(partial) {
+    S.settings = await vc.settings.set({ text: Object.assign({}, S.settings.text, partial) });
+    rulesChanged();
+  }
+  function renderRules() {
+    const t = S.settings.text || {};
+    $('#ruleWords').innerHTML = (t.words || []).map((w, i) => '<span class="chip">' + esc(w) + '<button type="button" data-delword="' + i + '" aria-label="Remove ' + esc(w) + '">✕</button></span>').join('') || '<span class="small muted">No words yet.</span>';
+    $('#ruleReplacements').innerHTML = (t.replacements || []).map((r, i) => '<div class="rule-row"><span>“' + esc(r.find) + '”</span><span class="muted">→</span><span>“' + esc(r.replace) + '”</span><button type="button" class="btn small ghost x" data-delrep="' + i + '" aria-label="Remove rule">✕</button></div>').join('');
+    const sample = 'our god is able — walk thru the fire';
+    $('#ruleExample').textContent = 'Example: “' + sample + '” → “' + TextRules.apply(sample, S.rules) + '”';
+  }
+  $('#ruleWordForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const w = $('#ruleWordInput').value.trim(); if (!w) return;
+    const words = (S.settings.text.words || []).filter((x) => x.toLowerCase() !== w.toLowerCase()).concat([w]);
+    $('#ruleWordInput').value = ''; saveText({ words });
+  });
+  $('#ruleRepForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const find = $('#ruleFind').value.trim(), replace = $('#ruleReplace').value.trim(); if (!find) return;
+    const replacements = (S.settings.text.replacements || []).filter((r) => r.find.toLowerCase() !== find.toLowerCase()).concat([{ find, replace }]);
+    $('#ruleFind').value = ''; $('#ruleReplace').value = ''; saveText({ replacements });
+  });
+  $('#settingsView').addEventListener('click', (e) => {
+    const dw = e.target.closest('[data-delword]');
+    if (dw) { const words = S.settings.text.words.slice(); words.splice(Number(dw.dataset.delword), 1); saveText({ words }); return; }
+    const dr = e.target.closest('[data-delrep]');
+    if (dr) { const replacements = S.settings.text.replacements.slice(); replacements.splice(Number(dr.dataset.delrep), 1); saveText({ replacements }); }
+  });
+  // transitions: ask the two sample previews to change words using the current settings
+  $('#previewFx').onclick = () => {
+    ['#setLower', '#setFull'].forEach((sel) => { const f = $(sel); if (f && f.contentWindow) f.contentWindow.postMessage({ gl: 'demo' }, '*'); });
+  };
   $('#settingsView').addEventListener('change', (e) => { if (e.target.dataset && e.target.dataset.k) applySetting(e.target); });
   $('#settingsView').addEventListener('input', (e) => { if (e.target.type === 'range' && e.target.dataset.k) { clearTimeout(applySetting._t); applySetting._t = setTimeout(() => applySetting(e.target), 120); } });
   $('#pickBg').onclick = async () => { const f = await vc.pickImage(); if (f) { S.settings = await vc.settings.set({ full: { bgImage: f } }); fillSettings(); } };

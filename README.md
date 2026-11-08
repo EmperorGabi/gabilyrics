@@ -18,12 +18,16 @@ All versions and release notes: [Releases](https://github.com/EmperorGabi/gabily
 
 - **Instant search**: searches song titles and every line of the lyrics in your local library as you type (well under 1 ms for normal libraries, a few ms at 10,000 songs).
 - **Online search**: runs only when nothing local matches (or when you press *Also search online*). Results come from free sources searched at the same time: Genius (finds songs from a line of the lyrics, needs a free token), LRCLIB, Hymnary.org and lyrics.ovh. Save a result to your library with one click. Songs you send live from the web are saved automatically, so next time they come from your library, even offline.
-- **Lower third or full screen**: switch with one click (or `L` / `F`). Lower thirds split each slide into pages of 2 lines (you can change this).
+- **Lower third or full screen**: switch with one click (or `L` / `F`). The NDI overlay source follows the switch, so if a camera fails you can go full screen on the same source. Lower thirds split each slide into pages of 2 lines (you can change this).
 - **Outputs**:
   - **NDI Program**: follows the operator's style; transparent background in lower-third mode.
   - **NDI Lower-third key**: always a lower third, with an alpha channel for keying in OBS / vMix / TriCaster / ATEM software.
   - **Projector**: a borderless full-screen window on a second display.
   - **Browser source**: `http://127.0.0.1:7380/output?style=lower` (or `full`, `follow`) for OBS, vMix or Ecamm. It's transparent wherever there is no text.
+
+- **Text rules**: words that are always spelt your way ("god" → "God"), find-and-replace, and capitalising each line.
+- **Transitions**: fade, slide, zoom, blur or cut, with your own timings; the full-screen background fades in when switching from a lower third.
+- **Share songs on your network**: computers running Gabilyrics on the same local network can browse, search and copy each other's song libraries (turn on in Settings).
 
 ## Run it
 
@@ -98,3 +102,14 @@ test/          npm test
 ```
 
 To add another online lyrics provider, add an entry to `providers` in `src/main/online.js`.
+
+## Licence
+
+Gabilyrics is released under the [MIT Licence](LICENSE) — © 2026 Gabriel Ochai. You may use, copy, change and share it freely, including commercially, as long as the copyright notice and licence text are kept.
+
+Third-party parts keep their own licences:
+
+- **NDI®** is a registered trademark of Vizrt NDI AB. NDI output uses the NDI SDK runtime library bundled by [grandi](https://github.com/tux-tn/grandi) (Apache-2.0); the NDI library itself is covered by the NDI SDK licence (see `libndi_licenses.txt` in the installed app). Learn more at [ndi.video](https://ndi.video).
+- **Electron** (MIT) and other npm packages listed in `package.json`.
+- Song lyrics are not part of this licence. Most worship songs are copyrighted — project and stream them only under a suitable licence (e.g. CCLI).
+

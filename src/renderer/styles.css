@@ -290,3 +290,24 @@ dialog.small-dialog { width: min(420px, 92vw); }
 .fx { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
 .fx label.check { font-size: 13px; }
 .fx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+
+/* text rules */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; border: 1px solid var(--line2); background: var(--card); font-size: 13px; }
+.chip button { width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.chip button:hover { background: var(--card-hi); color: var(--text); }
+.rule-rows { display: flex; flex-direction: column; gap: 6px; }
+.rule-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.rule-row .x { margin-left: auto; }
+/* network peers */
+.peer { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); }
+.peer-head { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; text-align: left; }
+.peer-head:hover { background: var(--card-hi); }
+.peer-head .t { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .imp { flex: none; }
+.netnote { font-size: 12px; color: var(--muted); padding: 2px 4px; }
+
+/* left sidebar: the list scrolls, "New song" / "Import" stay pinned at the bottom */
+.left.col { overflow: hidden; }
+.left > .pane { overflow-y: auto; margin: -14px; padding: 14px 14px 0; }
+.left .bottom { position: sticky; bottom: 0; z-index: 3; margin-top: auto; padding: 10px 0 14px; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -10px 12px -10px rgba(0, 0, 0, .35); }

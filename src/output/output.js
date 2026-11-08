@@ -8,7 +8,13 @@
   const TARGET = qs.get('target') || 'browser';
   const FEED = qs.get('feed') || 'live';
   const SAMPLE = qs.get('sample') === '1';
-  const SAMPLE_TEXT = 'Amazing grace! How sweet the sound\nThat saved a wretch like me!';
+  const SAMPLES = [
+    ['Amazing grace! How sweet the sound\nThat saved a wretch like me!', 'I once was lost, but now am found;\nWas blind, but now I see.'],
+    ['’Twas grace that taught my heart to fear,\nAnd grace my fears relieved;', 'How precious did that grace appear\nThe hour I first believed.'],
+  ];
+  let sampleIdx = 0;
+  // Settings' "Preview transition" button asks the sample previews to change words
+  window.addEventListener('message', (e) => { if (SAMPLE && e.data && e.data.gl === 'demo') { sampleIdx = (sampleIdx + 1) % SAMPLES.length; if (last) render(last); } });
 
   const $ = (s) => document.querySelector(s);
   const body = document.body;
@@ -62,30 +68,32 @@
     const st = payload.state || {};
     const s = payload.settings || {};
     const L = s.lower || {}, F = s.full || {};
-    body.style.setProperty('--fade', (s.transition ?? 200) + 'ms');
+    const fx = s.transitionType || 'fade';
+    const fadeMs = fx === 'cut' ? 0 : (s.transition ?? 200);
+    body.style.setProperty('--fade', fadeMs + 'ms');
+    body.style.setProperty('--mode', (fx === 'cut' ? 0 : (s.modeTransition ?? 500)) + 'ms');
+    body.style.setProperty('--ease', s.transitionEasing || 'ease');
+    $('#stage').dataset.fx = fx;
     const u = unit();
 
     let src = FEED === 'next' ? (st.next || { text: '', page: '', label: '' }) : st;
-    if (SAMPLE) src = { text: SAMPLE_TEXT + '\nI once was lost, but now am found;\nWas blind, but now I see.', page: SAMPLE_TEXT, first: true };
+    if (SAMPLE) { const smp = SAMPLES[sampleIdx]; src = { text: smp.join('\n'), page: smp[0], lower: smp[0], first: sampleIdx === 0 }; }
     const mode = STYLE === 'follow' ? (st.mode || 'lower') : STYLE;
     const blank = SAMPLE ? false : FEED === 'next' ? !src.text : !!st.blank;
     const isLower = mode === 'lower';
 
     // ----- background -----
-    cam.style.display = 'none';
-    bgimg.style.backgroundImage = '';
-    bgdim.style.background = 'transparent';
-    if (isLower) {
-      if (TARGET === 'monitor') { bg.style.background = '#232833'; cam.style.display = 'block'; }
-      else if (TARGET === 'projector') bg.style.background = '#000000';
-      else bg.style.background = 'transparent'; // NDI alpha / OBS browser source
-    } else {
-      bg.style.background = F.bg || '#000000';
-      if (F.bgImage) {
-        bgimg.style.backgroundImage = 'url("/media/background?v=' + encodeURIComponent(F.bgImage) + '")';
-        bgdim.style.background = 'rgba(0,0,0,' + ((F.bgDim ?? 40) / 100) + ')';
-      }
-    }
+    // Under everything: what's behind a lower third (camera placeholder in the console, black on a
+    // projector, transparent for NDI / browser sources). On top: the full-screen background, which
+    // fades in when switching to full screen and out when switching back.
+    const stage = $('#stage');
+    stage.style.background = TARGET === 'monitor' ? '#232833' : TARGET === 'projector' ? '#000000' : 'transparent';
+    cam.style.display = TARGET === 'monitor' ? 'block' : 'none';
+    bg.style.background = F.bg || '#000000';
+    const img = F.bgImage ? 'url("/media/background?v=' + encodeURIComponent(F.bgImage) + '")' : '';
+    if (bgimg.style.backgroundImage !== img) bgimg.style.backgroundImage = img;
+    bgdim.style.background = F.bgImage ? 'rgba(0,0,0,' + ((F.bgDim ?? 40) / 100) + ')' : 'transparent';
+    bg.classList.toggle('on', !isLower);
 
     // ----- styles -----
     applyEffects(fullTxt, F, u);
@@ -93,6 +101,8 @@
     fullTxt.style.fontFamily = F.font; fullTxt.style.fontWeight = F.weight; fullTxt.style.color = F.color;
     lower.style.left = (L.side * u) + 'px'; lower.style.right = (L.side * u) + 'px'; lower.style.bottom = (L.bottom * u) + 'px';
     lowerBox.style.background = hexA(L.boxColor, L.boxOpacity ?? 82);
+    lowerBox.style.padding = ((L.boxPadY ?? 20) * u) + 'px ' + ((L.boxPadX ?? 40) * u) + 'px';
+    lowerBox.style.borderRadius = ((L.boxRadius ?? 10) * u) + 'px';
     lowerTxt.style.fontFamily = L.font; lowerTxt.style.fontWeight = L.weight; lowerTxt.style.color = L.color;
     lowerTxt.style.fontSize = (L.size * u) + 'px';
     lowerTxt.style.textTransform = L.uppercase ? 'uppercase' : 'none';
@@ -128,7 +138,7 @@
     };
 
     clearTimeout(swapTimer);
-    const fade = s.transition ?? 200;
+    const fade = fadeMs;
     const anyOn = full.classList.contains('on') || lower.classList.contains('on');
     if (changedText && anyOn && fade > 0 && !force) {
       full.classList.remove('on'); lower.classList.remove('on'); credit.classList.remove('on');

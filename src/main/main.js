@@ -6,13 +6,14 @@ const { Store } = require('./store');
 const { OutputServer } = require('./server');
 const { NdiManager } = require('./ndi');
 const online = require('./online');
+const { Share, localIps } = require('./share');
 const Lyrics = require('../shared/lyrics');
 
 // Same icon everywhere: taskbar / dock, window, installer and the console's top bar.
 const APP_ICON = path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 if (process.platform === 'win32') app.setAppUserModelId('com.gabrielochai.gabilyrics');
 
-let store, server, ndi;
+let store, server, ndi, share;
 let consoleWin = null;
 let projectorWin = null;
 
@@ -36,9 +37,22 @@ function info() {
     dataDir: store.dir,
     displays: screen.getAllDisplays().map((d, i) => ({ id: d.id, label: 'Display ' + (i + 1) + ' — ' + d.size.width + '×' + d.size.height + (d.id === screen.getPrimaryDisplay().id ? ' (main)' : ''), primary: d.id === screen.getPrimaryDisplay().id })),
     ndi: ndi.status(),
+    sharing: { enabled: !!store.settings.sharing.enabled, name: computerName(), ips: localIps(), port: server.port },
     projector: !!(projectorWin && !projectorWin.isDestroyed()),
   };
 }
+
+// ---------- library sharing on the local network ----------
+function computerName() { return (store.settings.sharing.name || '').trim() || os.hostname(); }
+function libraryRev() { return store.library.length + ':' + store.library.reduce((m, s) => Math.max(m, s.updatedAt || 0), 0); }
+function sharedLibrary() {
+  if (!store.settings.sharing.enabled) return null;
+  return {
+    name: computerName(), rev: libraryRev(),
+    songs: store.library.map((s) => ({ id: s.id, title: s.title, author: s.author || '', copyright: s.copyright || '', slides: s.slides, updatedAt: s.updatedAt || 0 })),
+  };
+}
+const listenOnLan = () => !!(store.settings.server.lan || store.settings.sharing.enabled);
 
 function sendStatus() { if (consoleWin && !consoleWin.isDestroyed()) consoleWin.webContents.send('status', info()); }
 
@@ -102,8 +116,8 @@ function registerIpc() {
   ipcMain.handle('app:info', () => info());
 
   ipcMain.handle('library:all', () => store.library);
-  ipcMain.handle('library:save', (_e, song) => store.upsertSong(song));
-  ipcMain.handle('library:delete', (_e, id) => { store.deleteSong(id); return true; });
+  ipcMain.handle('library:save', (_e, song) => { const saved = store.upsertSong(song); setTimeout(() => share.announce(), 50); return saved; });
+  ipcMain.handle('library:delete', (_e, id) => { store.deleteSong(id); setTimeout(() => share.announce(), 50); return true; });
 
   ipcMain.handle('library:import', async () => {
     const r = await dialog.showOpenDialog(consoleWin, {
@@ -147,22 +161,25 @@ function registerIpc() {
     return r.filePath;
   });
 
+  ipcMain.handle('peers:list', () => share.list());
+
   ipcMain.handle('plans:get', () => store.plans);
   ipcMain.handle('plans:set', (_e, plans) => store.setPlans(plans));
 
   ipcMain.handle('settings:get', () => store.settings);
   ipcMain.handle('settings:set', async (_e, partial) => {
-    const prevServer = JSON.stringify(store.settings.server);
+    const prevServer = JSON.stringify([store.settings.server, listenOnLan()]);
     const s = store.setSettings(partial);
     if (partial && partial.search) online.clearCache();
     nativeTheme.themeSource = s.theme === 'light' ? 'light' : 'dark';
     if (consoleWin) consoleWin.setBackgroundColor(s.theme === 'light' ? '#F3F4F6' : '#0E1014');
     if (consoleWin && process.platform !== 'darwin' && consoleWin.setTitleBarOverlay) { try { consoleWin.setTitleBarOverlay(titleBarOverlay(s.theme)); } catch (e) { /* older Electron */ } }
-    if (JSON.stringify(s.server) !== prevServer) {
+    if (JSON.stringify([s.server, listenOnLan()]) !== prevServer) {
       await ndi.stopAll();
       await server.stop();
-      await server.start(s.server.port, s.server.lan);
+      await server.start(s.server.port, listenOnLan());
     }
+    if (partial && partial.sharing) share.announce();
     server.broadcast();
     await applyOutputs();
     return s;
@@ -191,8 +208,13 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin' && app.dock) { try { app.dock.setIcon(path.join(__dirname, '..', 'assets', 'icon.png')); } catch (e) { /* ignore */ } }
   store = new Store(path.join(app.getPath('userData'), 'data'));
   nativeTheme.themeSource = store.settings.theme === 'light' ? 'light' : 'dark';
-  server = new OutputServer(() => live, () => store.settings);
-  await server.start(store.settings.server.port, store.settings.server.lan);
+  server = new OutputServer(() => live, () => store.settings, sharedLibrary);
+  await server.start(store.settings.server.port, listenOnLan());
+  share = new Share(
+    () => ({ id: store.settings.sharing.id, name: computerName(), enabled: store.settings.sharing.enabled, port: server.port, rev: libraryRev(), count: store.library.length }),
+    (peers) => { if (consoleWin && !consoleWin.isDestroyed()) consoleWin.webContents.send('peers', peers); },
+  );
+  share.start();
   ndi = new NdiManager(server);
   registerIpc();
   createConsole();
@@ -239,7 +261,7 @@ async function selfTest(dir) {
   app.quit();
 }
 
-app.on('before-quit', async () => { if (store) store.flush(); });
+app.on('before-quit', async () => { if (store) store.flush(); if (share) share.stop(); });
 app.on('window-all-closed', async () => {
   if (store) store.flush();
   if (ndi) await ndi.stopAll();

@@ -5,17 +5,18 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/search.test.js && node test/online.test.js",
+    "test": "node test/search.test.js && node test/online.test.js && node test/textrules.test.js",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac"
+    "dist:mac": "electron-builder --mac",
+    "test:network": "node test/share.test.js"
   },
   "author": "Gabriel Ochai",
   "repository": {
     "type": "git",
     "url": "https://github.com/EmperorGabi/gabilyrics.git"
   },
-  "license": "UNLICENSED",
+  "license": "MIT",
   "devDependencies": {
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8"

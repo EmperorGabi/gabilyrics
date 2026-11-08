@@ -13,9 +13,10 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
 
 class OutputServer {
-  constructor(getState, getSettings) {
+  constructor(getState, getSettings, getSharedLibrary) {
     this.getState = getState;
     this.getSettings = getSettings;
+    this.getSharedLibrary = getSharedLibrary || (() => null);   // null = sharing off
     this.clients = new Set();
     this.sockets = new Set();   // WebSocket clients
     this.server = null;
@@ -105,6 +106,14 @@ class OutputServer {
       this.clients.add(res);
       const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch (e) { /* closed */ } }, 15000);
       req.on('close', () => { clearInterval(ping); this.clients.delete(res); });
+      return;
+    }
+    if (p === '/api/library') {
+      // read-only copy of this computer's song library, for other Gabilyrics computers on the network
+      const lib = this.getSharedLibrary();
+      if (!lib) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end('{"error":"sharing is off"}'); return; }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(JSON.stringify(lib));
       return;
     }
     if (p === '/state') { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(this.payload()); return; }
