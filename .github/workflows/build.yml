@@ -34,6 +34,10 @@ jobs:
             os: macos-latest
             args: --mac --x64 --arm64   # Intel and Apple Silicon
     runs-on: ${{ matrix.os }}
+    env:
+      # Keep Electron / electron-builder downloads in one place so they can be cached between runs.
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
     steps:
       - uses: actions/checkout@v4
 
@@ -53,8 +57,25 @@ jobs:
         shell: bash
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
+      # Reuse the Electron and build-tool downloads from earlier runs, so a GitHub
+      # download hiccup (e.g. a 504) doesn't break the build.
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-${{ runner.os }}-
+
       - name: Build installers
-        run: npx electron-builder ${{ matrix.args }} --publish never
+        shell: bash
+        # Retry up to 3 times: downloads from GitHub occasionally time out.
+        run: |
+          for attempt in 1 2 3; do
+            npx electron-builder ${{ matrix.args }} --publish never && exit 0
+            echo "::warning::Build attempt $attempt failed; retrying in 30s..."
+            sleep 30
+          done
+          exit 1
         env:
           # No paid code-signing certificate yet: skip signing (macOS gets an ad-hoc signature instead).
           # Add CSC_LINK / CSC_KEY_PASSWORD secrets later to sign properly.
